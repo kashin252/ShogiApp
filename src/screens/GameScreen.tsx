@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
-  Alert,
+  Modal,
 } from 'react-native';
 import { Board } from '../components/Board';
 import { CapturedPieces } from '../components/CapturedPieces';
@@ -18,6 +18,7 @@ import { decodeTo, decodePromote } from '../engine/move';
 export const GameScreen: React.FC = () => {
   const [mode, setMode] = useState<GameMode>('pvp');
   const [isFlipped, setIsFlipped] = useState(false);
+  const [showNewGameModal, setShowNewGameModal] = useState(false);
 
   const {
     gameState,
@@ -25,6 +26,7 @@ export const GameScreen: React.FC = () => {
     setSelection,
     isThinking,
     playerSide,
+    searchResult,
     makeMove,
     getLegalMoves,
     resetGame,
@@ -100,31 +102,13 @@ export const GameScreen: React.FC = () => {
     setLegalMoves(legal.map((m) => decodeTo(m)));
   };
 
-  const handleNewGamePress = () => {
-    Alert.alert(
-      '新規対局',
-      '対局モードを選択してください',
-      [
-        {
-          text: '対人戦 (PvP)',
-          onPress: () => {
-            setMode('pvp');
-            resetGame();
-          },
-        },
-        {
-          text: '対AI戦',
-          onPress: () => {
-            setMode('ai');
-            resetGame();
-          },
-        },
-        {
-          text: 'キャンセル',
-          style: 'cancel',
-        },
-      ]
-    );
+  const startNewGame = (newMode: GameMode) => {
+    setShowNewGameModal(false);
+    setMode(newMode);
+    // Wait for next render cycle to ensure mode is updated
+    setTimeout(() => {
+      resetGame();
+    }, 0);
   };
 
   // Determine which hand to show at top/bottom based on flip state
@@ -136,12 +120,6 @@ export const GameScreen: React.FC = () => {
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>🎴 将棋アプリ</Text>
-          <TouchableOpacity
-            style={styles.rotateBtn}
-            onPress={() => setIsFlipped(!isFlipped)}
-          >
-            <Text style={styles.rotateBtnText}>盤面反転</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.statusPanel}>
@@ -156,6 +134,18 @@ export const GameScreen: React.FC = () => {
                 ? `${gameState.turn === 0 ? '後手' : '先手'}の勝ち`
                 : `${gameState.turn === 0 ? '先手' : '後手'}の番`}
             </Text>
+          )}
+
+          {/* Search Info Display */}
+          {mode === 'ai' && searchResult && (
+            <View style={styles.searchInfo}>
+              <Text style={styles.searchInfoText}>
+                深さ: {searchResult.depth} | 評価値: {searchResult.score > 0 ? '+' : ''}{searchResult.score}
+              </Text>
+              <Text style={styles.searchInfoText}>
+                探索局面数: {searchResult.nodes.toLocaleString()} | 時間: {searchResult.time}ms
+              </Text>
+            </View>
           )}
         </View>
 
@@ -198,9 +188,54 @@ export const GameScreen: React.FC = () => {
           />
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={handleNewGamePress}>
-          <Text style={styles.buttonText}>新規対局</Text>
-        </TouchableOpacity>
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.button} onPress={() => setShowNewGameModal(true)}>
+            <Text style={styles.buttonText}>新規対局</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.rotateBtn]}
+            onPress={() => setIsFlipped(!isFlipped)}
+          >
+            <Text style={styles.buttonText}>盤面反転</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* New Game Modal */}
+        <Modal
+          visible={showNewGameModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowNewGameModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>新規対局</Text>
+              <Text style={styles.modalMessage}>対局モードを選択してください</Text>
+
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => startNewGame('pvp')}
+              >
+                <Text style={styles.modalButtonText}>対人戦 (PvP)</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => startNewGame('ai')}
+              >
+                <Text style={styles.modalButtonText}>対AI戦</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setShowNewGameModal(false)}
+              >
+                <Text style={styles.modalCancelButtonText}>キャンセル</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -219,10 +254,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
     width: '100%',
-    position: 'relative',
   },
   title: {
     fontSize: 24,
@@ -230,21 +262,9 @@ const styles = StyleSheet.create({
     color: colors.primaryDark,
     marginBottom: 8,
   },
-  rotateBtn: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    padding: 8,
-    backgroundColor: '#ddd',
-    borderRadius: 5,
-  },
-  rotateBtnText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#333',
-  },
   statusPanel: {
     marginVertical: 4,
+    alignItems: 'center',
   },
   thinkingPanel: {
     flexDirection: 'row',
@@ -256,6 +276,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text,
   },
+  searchInfo: {
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  searchInfoText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
   gameArea: {
     flexDirection: 'column',
     alignItems: 'center',
@@ -265,15 +294,77 @@ const styles = StyleSheet.create({
   boardRotated: {
     transform: [{ rotate: '180deg' }],
   },
+  footer: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 8,
+  },
   button: {
     backgroundColor: colors.primary,
-    paddingHorizontal: 30,
+    paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
-    marginBottom: 8,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  rotateBtn: {
+    backgroundColor: '#666',
   },
   buttonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
+    width: '80%',
+    maxWidth: 320,
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: colors.text,
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 20,
+  },
+  modalButton: {
+    width: '100%',
+    paddingVertical: 12,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalCancelButton: {
+    backgroundColor: '#ddd',
+    marginBottom: 0,
+  },
+  modalCancelButtonText: {
+    color: '#333',
     fontSize: 16,
     fontWeight: 'bold',
   },

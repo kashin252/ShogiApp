@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ShogiGame } from '../engine/game';
-import { GameState, GameMode, Selection } from '../types/game.types';
+import { GameState, GameMode, Selection, SearchResult } from '../types/game.types';
 import { decodeTo } from '../engine/move';
 
 export function useGame(mode: GameMode = 'pvp') {
@@ -9,6 +9,7 @@ export function useGame(mode: GameMode = 'pvp') {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [isThinking, setIsThinking] = useState(false);
   const [playerSide, setPlayerSide] = useState<0 | 1>(0);
+  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
 
   const updateState = useCallback(() => {
     setGameState(game.getState());
@@ -18,13 +19,14 @@ export function useGame(mode: GameMode = 'pvp') {
     game.reset();
     setSelection(null);
     setIsThinking(false);
-    
+    setSearchResult(null);
+
     if (mode === 'ai') {
       setPlayerSide(Math.random() < 0.5 ? 0 : 1);
     } else {
       setPlayerSide(0);
     }
-    
+
     updateState();
   }, [game, mode, updateState]);
 
@@ -37,16 +39,17 @@ export function useGame(mode: GameMode = 'pvp') {
 
       if (mode === 'ai' && !game.gameOver && game.turn !== playerSide) {
         setIsThinking(true);
-        
+
         setTimeout(async () => {
           const result = await game.findBestMove(15000);
-          
+          setSearchResult(result);
+
           if (result.move !== 0) {
             game.applyMove(result.move);
             game.lastMovePos = decodeTo(result.move);
             updateState();
           }
-          
+
           setIsThinking(false);
         }, 300);
       }
@@ -65,7 +68,8 @@ export function useGame(mode: GameMode = 'pvp') {
 
   useEffect(() => {
     resetGame();
-  }, [resetGame]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
     gameState,
@@ -73,6 +77,7 @@ export function useGame(mode: GameMode = 'pvp') {
     setSelection,
     isThinking,
     playerSide,
+    searchResult,
     makeMove,
     getLegalMoves,
     resetGame,
