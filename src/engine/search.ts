@@ -1,19 +1,45 @@
 import { ShogiGame } from './game';
-import { SearchResult } from '../types/game.types';
+import { SearchResult, PIECE_VALUES } from '../types/game.types';
 import { generateMoves } from './moveGenerator';
 import { makeMove, unmakeMove } from './makeMove';
 import { isInCheck } from './check';
 import { evaluate } from './evaluate';
 import { TT_MASK, TT_EXACT, TT_LOWER, TT_UPPER } from './constants';
-import { decodeDrop, decodeCaptured } from './move';
+import { decodeDrop, decodeCaptured, decodeTo, decodeFrom, decodePiece } from './move';
 
 let nodes = 0;
 let startTime = 0;
 let timeLimit = 0;
 let stopped = false;
 
+// Move Ordering Heuristics
+function getMoveScore(game: ShogiGame, move: number, ttMove: number): number {
+  if (move === ttMove) return 2000000; // TT move first
+
+  const captured = decodeCaptured(move);
+  const piece = decodePiece(move);
+
+  // MVV-LVA (Most Valuable Victim - Least Valuable Aggressor)
+  if (captured > 0) {
+    return 1000000 + captured * 100 - piece;
+  }
+
+  // Killer Moves (TODO: Implement Killer Heuristic properly)
+
+  // History Heuristic (TODO: Implement History Heuristic properly)
+
+  return 0;
+}
+
 function quiesce(game: ShogiGame, alpha: number, beta: number, depth: number): number {
   nodes++;
+
+  if ((nodes & 4095) === 0) {
+    if (Date.now() - startTime > timeLimit) {
+      stopped = true;
+      return 0;
+    }
+  }
 
   const standPat = evaluate(game);
   if (standPat >= beta) return beta;
@@ -23,10 +49,18 @@ function quiesce(game: ShogiGame, alpha: number, beta: number, depth: number): n
   const moves = new Int32Array(256);
   const cnt = generateMoves(game, moves);
 
+  // Sort captures
+  const scoredMoves: { move: number; score: number }[] = [];
   for (let i = 0; i < cnt; i++) {
     const m = moves[i];
     if (decodeDrop(m)) continue;
     if (decodeCaptured(m) === 0) continue;
+    scoredMoves.push({ move: m, score: decodeCaptured(m) });
+  }
+  scoredMoves.sort((a, b) => b.score - a.score);
+
+  for (let i = 0; i < scoredMoves.length; i++) {
+    const m = scoredMoves[i].move;
 
     makeMove(game, m);
     if (isInCheck(game, 1 - game.turn)) {
@@ -36,6 +70,8 @@ function quiesce(game: ShogiGame, alpha: number, beta: number, depth: number): n
 
     const score = -quiesce(game, -beta, -alpha, depth - 1);
     unmakeMove(game, m);
+
+    if (stopped) return 0;
 
     if (score >= beta) return beta;
     if (score > alpha) alpha = score;
@@ -62,6 +98,13 @@ function alphaBeta(
 
   if (stopped) return 0;
 
+  const inCheck = isInCheck(game, game.turn);
+  if (inCheck) depth++; // Check Extension
+
+  if (depth <= 0) {
+    return quiesce(game, alpha, beta, 0);
+  }
+
   const origAlpha = alpha;
 
   // TT probe
@@ -78,19 +121,39 @@ function alphaBeta(
     }
   }
 
-  if (depth <= 0) {
-    return quiesce(game, alpha, beta, 0);
+  // Null Move Pruning (Disabled for stability)
+  /*
+  if (nullOk && !inCheck && depth >= 3 && beta <= 20000) {
+    // Make null move (swap turn)
+    game.turn = (1 - game.turn) as 0 | 1;
+    game.currentHash ^= 123456789; // Simple hash update for null move
+
+    const score = -alphaBeta(game, depth - 3, -beta, -beta + 1, false);
+
+    game.turn = (1 - game.turn) as 0 | 1;
+    game.currentHash ^= 123456789;
+
+    if (stopped) return 0;
+    if (score >= beta) return beta;
   }
+  */
 
   const moves = new Int32Array(512);
   const cnt = generateMoves(game, moves);
+
+  // Move Ordering
+  const scoredMoves: { move: number; score: number }[] = [];
+  for (let i = 0; i < cnt; i++) {
+    scoredMoves.push({ move: moves[i], score: getMoveScore(game, moves[i], ttBestMove) });
+  }
+  scoredMoves.sort((a, b) => b.score - a.score);
 
   let bestMove = 0;
   let bestScore = -100000;
   let legalMoves = 0;
 
-  for (let i = 0; i < cnt; i++) {
-    const m = moves[i];
+  for (let i = 0; i < scoredMoves.length; i++) {
+    const m = scoredMoves[i].move;
 
     makeMove(game, m);
     if (isInCheck(game, 1 - game.turn)) {
@@ -99,7 +162,18 @@ function alphaBeta(
     }
     legalMoves++;
 
-    const score = -alphaBeta(game, depth - 1, -beta, -alpha, true);
+    // LMR (Late Move Reduction)
+    let score = 0;
+    if (legalMoves > 4 && depth >= 3 && i > 0 && !inCheck && decodeCaptured(m) === 0 && m !== ttBestMove) {
+      score = -alphaBeta(game, depth - 2, -beta, -alpha, true);
+    } else {
+      score = -alphaBeta(game, depth - 1, -beta, -alpha, true);
+    }
+
+    // Re-search if LMR failed
+    if (score > alpha && score < beta && legalMoves > 4 && depth >= 3 && i > 0 && !inCheck && decodeCaptured(m) === 0 && m !== ttBestMove) {
+      score = -alphaBeta(game, depth - 1, -beta, -alpha, true);
+    }
 
     unmakeMove(game, m);
 

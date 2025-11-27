@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Text, Dimensions } from 'react-native';
 import { colors } from '../styles/colors';
 import { PIECE_CHARS } from '../types/game.types';
 
@@ -10,6 +10,21 @@ interface BoardProps {
   legalMoves: number[];
   onSquarePress: (sq: number) => void;
 }
+
+const { width, height } = Dimensions.get('window');
+const BOARD_PADDING = 16;
+const OTHER_UI_HEIGHT = 320; // Approx height for header, captured pieces, buttons, margins
+
+// Ensure the board fits within the screen width AND height
+const MAX_BOARD_WIDTH = Math.min(width - BOARD_PADDING * 2, 400);
+const MAX_BOARD_HEIGHT = height - OTHER_UI_HEIGHT;
+
+// Calculate square size based on the most constraining dimension
+const SQUARE_SIZE_W = Math.floor(MAX_BOARD_WIDTH / 9);
+const SQUARE_SIZE_H = Math.floor(MAX_BOARD_HEIGHT / 9);
+const SQUARE_SIZE = Math.min(SQUARE_SIZE_W, SQUARE_SIZE_H);
+
+const BOARD_SIZE = SQUARE_SIZE * 9;
 
 export const Board: React.FC<BoardProps> = ({
   board,
@@ -37,6 +52,7 @@ export const Board: React.FC<BoardProps> = ({
         key={sq}
         style={squareStyle}
         onPress={() => onSquarePress(sq)}
+        activeOpacity={0.7}
       >
         {isLegalMove && <View style={styles.legalDot} />}
         {v !== 0 && (
@@ -54,24 +70,43 @@ export const Board: React.FC<BoardProps> = ({
     );
   };
 
+  const renderRow = (rowIdx: number) => {
+    return (
+      <View key={rowIdx} style={styles.row}>
+        {Array.from({ length: 9 }, (_, colIdx) => {
+          const sq = rowIdx * 9 + colIdx;
+          return renderSquare(sq);
+        })}
+      </View>
+    );
+  };
+
   return (
-    <View style={styles.board}>
-      {Array.from({ length: 81 }, (_, i) => renderSquare(i))}
+    <View style={styles.boardContainer}>
+      <View style={styles.board}>
+        {Array.from({ length: 9 }, (_, i) => renderRow(i))}
+      </View>
     </View>
   );
 };
 
-const SQUARE_SIZE = 38;
-
 const styles = StyleSheet.create({
+  boardContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 2,
+    backgroundColor: colors.boardBg,
+  },
   board: {
-    width: SQUARE_SIZE * 9,
-    height: SQUARE_SIZE * 9,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    borderWidth: 3,
+    width: BOARD_SIZE,
+    height: BOARD_SIZE,
+    borderWidth: 2,
     borderColor: '#000',
     backgroundColor: colors.boardBg,
+  },
+  row: {
+    flexDirection: 'row',
+    height: SQUARE_SIZE,
   },
   square: {
     width: SQUARE_SIZE,
@@ -90,16 +125,19 @@ const styles = StyleSheet.create({
   },
   legalDot: {
     position: 'absolute',
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: SQUARE_SIZE * 0.25,
+    height: SQUARE_SIZE * 0.25,
+    borderRadius: SQUARE_SIZE * 0.125,
     backgroundColor: colors.legalMove,
     zIndex: 1,
+    opacity: 0.6,
   },
   piece: {
-    fontSize: 20,
+    fontSize: SQUARE_SIZE * 0.6,
     fontWeight: 'bold',
     color: colors.pieceSente,
+    textAlign: 'center',
+    lineHeight: SQUARE_SIZE * 0.7, // Adjust line height to center vertically better if needed
   },
   pieceRotated: {
     transform: [{ rotate: '180deg' }],

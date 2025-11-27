@@ -19,10 +19,11 @@ export const CapturedPieces: React.FC<CapturedPiecesProps> = ({
   title,
 }) => {
   const order = [FU, KYO, KEI, GIN, KIN, KAKU, HI];
+  const isGote = side === 1;
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{title}</Text>
+      <Text style={[styles.title, isGote && styles.titleRotated]}>{title}</Text>
       <View style={styles.pieces}>
         {order.map((pt) => {
           const cnt = hand[pt];
@@ -33,10 +34,16 @@ export const CapturedPieces: React.FC<CapturedPiecesProps> = ({
           return (
             <TouchableOpacity
               key={pt}
-              style={[styles.piece, isSelected && styles.pieceSelected]}
+              style={[
+                styles.piece,
+                isSelected && styles.pieceSelected,
+                isGote && styles.pieceRotated // Rotate the whole piece container
+              ]}
               onPress={() => onPiecePress(pt)}
             >
-              <Text style={styles.pieceText}>{PIECE_CHARS[pt]}</Text>
+              <Text style={styles.pieceText}>
+                {PIECE_CHARS[pt]}
+              </Text>
               {cnt > 1 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{cnt}</Text>
@@ -58,13 +65,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 8,
     minWidth: 80,
-    minHeight: 100,
+    minHeight: 80, // Reduced min height slightly
+    alignItems: 'center',
   },
   title: {
     fontSize: 11,
     fontWeight: 'bold',
     marginBottom: 6,
     textAlign: 'center',
+  },
+  titleRotated: {
+    transform: [{ rotate: '180deg' }],
   },
   pieces: {
     flexDirection: 'row',
@@ -73,8 +84,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   piece: {
-    width: 32,
-    height: 32,
+    width: 34,
+    height: 34,
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#ccc',
@@ -83,13 +94,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
+  pieceRotated: {
+    transform: [{ rotate: '180deg' }],
+  },
   pieceSelected: {
     backgroundColor: colors.selectedSquare,
     borderColor: '#f57c00',
   },
   pieceText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
+    color: colors.pieceSente,
   },
   badge: {
     position: 'absolute',
@@ -99,6 +114,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     paddingHorizontal: 3,
     paddingVertical: 1,
+    zIndex: 1,
   },
   badgeText: {
     color: '#fff',

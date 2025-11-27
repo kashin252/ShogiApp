@@ -5,7 +5,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  ScrollView,
+  SafeAreaView,
+  Alert,
 } from 'react-native';
 import { Board } from '../components/Board';
 import { CapturedPieces } from '../components/CapturedPieces';
@@ -16,6 +17,8 @@ import { decodeTo, decodePromote } from '../engine/move';
 
 export const GameScreen: React.FC = () => {
   const [mode, setMode] = useState<GameMode>('pvp');
+  const [isFlipped, setIsFlipped] = useState(false);
+
   const {
     gameState,
     selection,
@@ -30,6 +33,16 @@ export const GameScreen: React.FC = () => {
   const [legalMoves, setLegalMoves] = useState<number[]>([]);
 
   const handleSquarePress = (sq: number) => {
+    // If flipped, the click coordinates need to be mapped if the Board component doesn't handle it.
+    // However, since we are just rotating the VIEW of the board, the logical indices (0-80) remain the same
+    // relative to the board's internal logic.
+    // BUT, if we rotate the board view 180deg, the top-left visual square becomes the bottom-right logical square?
+    // Actually, if we just rotate the whole Board component, the visual tap on "top left" will hit the "bottom right" component.
+    // Let's check how Board handles presses. It maps index to square.
+    // If we rotate the Board View, the touch events rotate with it.
+    // So pressing the visual top-left (which is logically 80) should correctly pass 80 to this handler.
+    // So no coordinate transformation is needed here if we use transform: rotate.
+
     if (gameState.gameOver) return;
     if (mode === 'ai' && gameState.turn !== playerSide) return;
 
@@ -39,7 +52,7 @@ export const GameScreen: React.FC = () => {
     if (selection && selection.drop) {
       const moves = getLegalMoves(undefined, selection.drop.piece);
       const targetMove = moves.find((m) => decodeTo(m) === sq);
-      
+
       if (targetMove) {
         makeMove(targetMove);
         setSelection(null);
@@ -60,7 +73,7 @@ export const GameScreen: React.FC = () => {
         } else {
           makeMove(targetMoves[0]);
         }
-        
+
         setSelection(null);
         setLegalMoves([]);
         return;
@@ -87,126 +100,151 @@ export const GameScreen: React.FC = () => {
     setLegalMoves(legal.map((m) => decodeTo(m)));
   };
 
-  const handleModeChange = (newMode: GameMode) => {
-    setMode(newMode);
-    resetGame();
+  const handleNewGamePress = () => {
+    Alert.alert(
+      '新規対局',
+      '対局モードを選択してください',
+      [
+        {
+          text: '対人戦 (PvP)',
+          onPress: () => {
+            setMode('pvp');
+            resetGame();
+          },
+        },
+        {
+          text: '対AI戦',
+          onPress: () => {
+            setMode('ai');
+            resetGame();
+          },
+        },
+        {
+          text: 'キャンセル',
+          style: 'cancel',
+        },
+      ]
+    );
   };
 
+  // Determine which hand to show at top/bottom based on flip state
+  const topHandSide = isFlipped ? 0 : 1;
+  const bottomHandSide = isFlipped ? 1 : 0;
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>🎴 将棋アプリ</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>🎴 将棋アプリ</Text>
+          <TouchableOpacity
+            style={styles.rotateBtn}
+            onPress={() => setIsFlipped(!isFlipped)}
+          >
+            <Text style={styles.rotateBtnText}>盤面反転</Text>
+          </TouchableOpacity>
+        </View>
 
-      <View style={styles.modePanel}>
-        <TouchableOpacity
-          style={[styles.modeBtn, mode === 'pvp' && styles.modeBtnActive]}
-          onPress={() => handleModeChange('pvp')}
-        >
-          <Text style={[styles.modeBtnText, mode === 'pvp' && styles.modeBtnTextActive]}>
-            対人
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.modeBtn, mode === 'ai' && styles.modeBtnActive]}
-          onPress={() => handleModeChange('ai')}
-        >
-          <Text style={[styles.modeBtnText, mode === 'ai' && styles.modeBtnTextActive]}>
-            対AI
-          </Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.statusPanel}>
+          {isThinking ? (
+            <View style={styles.thinkingPanel}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.statusText}>AI思考中...</Text>
+            </View>
+          ) : (
+            <Text style={styles.statusText}>
+              {gameState.gameOver
+                ? `${gameState.turn === 0 ? '後手' : '先手'}の勝ち`
+                : `${gameState.turn === 0 ? '先手' : '後手'}の番`}
+            </Text>
+          )}
+        </View>
 
-      <View style={styles.statusPanel}>
-        {isThinking ? (
-          <View style={styles.thinkingPanel}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={styles.statusText}>AI思考中...</Text>
+        <View style={styles.gameArea}>
+          {/* Top Hand */}
+          <CapturedPieces
+            hand={gameState.hand[topHandSide]}
+            side={topHandSide}
+            selectedPiece={
+              selection && selection.drop && selection.drop.side === topHandSide
+                ? selection.drop.piece
+                : null
+            }
+            onPiecePress={(p) => handleHandPress(topHandSide, p)}
+            title={topHandSide === 0 ? "先手持ち駒" : "後手持ち駒"}
+          />
+
+          {/* Board */}
+          <View style={isFlipped ? styles.boardRotated : null}>
+            <Board
+              board={gameState.board}
+              lastMovePos={gameState.lastMovePos}
+              selectedPos={selection && selection.pos !== undefined ? selection.pos : null}
+              legalMoves={legalMoves}
+              onSquarePress={handleSquarePress}
+            />
           </View>
-        ) : (
-          <Text style={styles.statusText}>
-            {gameState.gameOver
-              ? `${gameState.turn === 0 ? '後手' : '先手'}の勝ち`
-              : `${gameState.turn === 0 ? '先手' : '後手'}の番`}
-          </Text>
-        )}
+
+          {/* Bottom Hand */}
+          <CapturedPieces
+            hand={gameState.hand[bottomHandSide]}
+            side={bottomHandSide}
+            selectedPiece={
+              selection && selection.drop && selection.drop.side === bottomHandSide
+                ? selection.drop.piece
+                : null
+            }
+            onPiecePress={(p) => handleHandPress(bottomHandSide, p)}
+            title={bottomHandSide === 0 ? "先手持ち駒" : "後手持ち駒"}
+          />
+        </View>
+
+        <TouchableOpacity style={styles.button} onPress={handleNewGamePress}>
+          <Text style={styles.buttonText}>新規対局</Text>
+        </TouchableOpacity>
       </View>
-
-      <View style={styles.gameArea}>
-        <CapturedPieces
-          hand={gameState.hand[1]}
-          side={1}
-          selectedPiece={
-            selection && selection.drop && selection.drop.side === 1
-              ? selection.drop.piece
-              : null
-          }
-          onPiecePress={(p) => handleHandPress(1, p)}
-          title="後手持ち駒"
-        />
-
-        <Board
-          board={gameState.board}
-          lastMovePos={gameState.lastMovePos}
-          selectedPos={selection && selection.pos !== undefined ? selection.pos : null}
-          legalMoves={legalMoves}
-          onSquarePress={handleSquarePress}
-        />
-
-        <CapturedPieces
-          hand={gameState.hand[0]}
-          side={0}
-          selectedPiece={
-            selection && selection.drop && selection.drop.side === 0
-              ? selection.drop.piece
-              : null
-          }
-          onPiecePress={(p) => handleHandPress(0, p)}
-          title="先手持ち駒"
-        />
-      </View>
-
-      <TouchableOpacity style={styles.button} onPress={resetGame}>
-        <Text style={styles.buttonText}>新規対局</Text>
-      </TouchableOpacity>
-    </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
+  safeArea: {
+    flex: 1,
     backgroundColor: colors.background,
+  },
+  container: {
+    flex: 1,
     padding: 16,
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  header: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    width: '100%',
+    position: 'relative',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: colors.primaryDark,
-    marginBottom: 16,
+    marginBottom: 8,
   },
-  modePanel: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
-  },
-  modeBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 5,
+  rotateBtn: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    padding: 8,
     backgroundColor: '#ddd',
+    borderRadius: 5,
   },
-  modeBtnActive: {
-    backgroundColor: colors.primary,
-  },
-  modeBtnText: {
+  rotateBtnText: {
+    fontSize: 12,
     fontWeight: 'bold',
-    color: '#666',
-  },
-  modeBtnTextActive: {
-    color: '#fff',
+    color: '#333',
   },
   statusPanel: {
-    marginBottom: 16,
+    marginVertical: 4,
   },
   thinkingPanel: {
     flexDirection: 'row',
@@ -221,14 +259,18 @@ const styles = StyleSheet.create({
   gameArea: {
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 20,
+    gap: 8,
+    width: '100%',
+  },
+  boardRotated: {
+    transform: [{ rotate: '180deg' }],
   },
   button: {
     backgroundColor: colors.primary,
     paddingHorizontal: 30,
     paddingVertical: 12,
     borderRadius: 8,
+    marginBottom: 8,
   },
   buttonText: {
     color: '#fff',

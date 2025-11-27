@@ -23,75 +23,78 @@ export function generateMoves(game: ShogiGame, moves: Int32Array): number {
     const pt = v * sign;
     const r = Math.floor(sq / 9);
 
-    let targets: number[] = [];
+    // Helper to add moves
+    const addMoves = (targets: number[]) => {
+      for (let i = 0; i < targets.length; i++) {
+        const to = targets[i];
+        const tv = game.board[to];
+        if (tv !== 0 && (tv > 0) === (side === 0)) continue;
+
+        const toR = Math.floor(to / 9);
+        const captured = tv === 0 ? 0 : UNPROMOTE[tv * enemySign];
+
+        const canPromote =
+          PROMOTE_MAP[pt] !== 0 &&
+          ((side === 0 && (r <= 2 || toR <= 2)) || (side === 1 && (r >= 6 || toR >= 6)));
+
+        const mustPromote =
+          ((pt === FU || pt === KYO) &&
+            ((side === 0 && toR === 0) || (side === 1 && toR === 8))) ||
+          (pt === KEI && ((side === 0 && toR <= 1) || (side === 1 && toR >= 7)));
+
+        if (mustPromote) {
+          moves[idx++] = encodeMove(sq, to, true, false, pt, captured);
+        } else {
+          moves[idx++] = encodeMove(sq, to, false, false, pt, captured);
+          if (canPromote) {
+            moves[idx++] = encodeMove(sq, to, true, false, pt, captured);
+          }
+        }
+      }
+    };
 
     switch (pt) {
       case FU:
         const fuTo = side === 0 ? ATTACK_FU_S[sq] : ATTACK_FU_G[sq];
-        if (fuTo >= 0) targets.push(fuTo);
+        if (fuTo >= 0) addMoves([fuTo]);
         break;
       case KYO:
-        targets = kyoAttacks(sq, side, game.board);
+        addMoves(kyoAttacks(sq, side, game.board));
         break;
       case KEI:
-        targets = side === 0 ? ATTACK_KEI_S[sq] : ATTACK_KEI_G[sq];
+        addMoves(side === 0 ? ATTACK_KEI_S[sq] : ATTACK_KEI_G[sq]);
         break;
       case GIN:
-        targets = side === 0 ? ATTACK_GIN_S[sq] : ATTACK_GIN_G[sq];
+        addMoves(side === 0 ? ATTACK_GIN_S[sq] : ATTACK_GIN_G[sq]);
         break;
       case KIN:
       case TO:
       case NKYO:
       case NKEI:
       case NGIN:
-        targets = side === 0 ? ATTACK_KIN_S[sq] : ATTACK_KIN_G[sq];
+        addMoves(side === 0 ? ATTACK_KIN_S[sq] : ATTACK_KIN_G[sq]);
         break;
       case KAKU:
-        targets = kakuAttacks(sq, game.board);
+        addMoves(kakuAttacks(sq, game.board));
         break;
       case HI:
-        targets = hiAttacks(sq, game.board);
+        addMoves(hiAttacks(sq, game.board));
         break;
       case UMA:
-        targets = kakuAttacks(sq, game.board).concat(ATTACK_OU[sq]);
+        addMoves(kakuAttacks(sq, game.board));
+        addMoves(ATTACK_OU[sq]);
         break;
       case RYU:
-        targets = hiAttacks(sq, game.board).concat(ATTACK_OU[sq]);
+        addMoves(hiAttacks(sq, game.board));
+        addMoves(ATTACK_OU[sq]);
         break;
       case OU:
       case TAISHI:
-        targets = ATTACK_OU[sq];
+        addMoves(ATTACK_OU[sq]);
         break;
       case ZOU:
-        targets = side === 0 ? ATTACK_ZOU_S[sq] : ATTACK_ZOU_G[sq];
+        addMoves(side === 0 ? ATTACK_ZOU_S[sq] : ATTACK_ZOU_G[sq]);
         break;
-    }
-
-    for (let i = 0; i < targets.length; i++) {
-      const to = targets[i];
-      const tv = game.board[to];
-      if (tv !== 0 && (tv > 0) === (side === 0)) continue;
-
-      const toR = Math.floor(to / 9);
-      const captured = tv === 0 ? 0 : UNPROMOTE[tv * enemySign];
-
-      const canPromote =
-        PROMOTE_MAP[pt] !== 0 &&
-        ((side === 0 && (r <= 2 || toR <= 2)) || (side === 1 && (r >= 6 || toR >= 6)));
-
-      const mustPromote =
-        ((pt === FU || pt === KYO) &&
-          ((side === 0 && toR === 0) || (side === 1 && toR === 8))) ||
-        (pt === KEI && ((side === 0 && toR <= 1) || (side === 1 && toR >= 7)));
-
-      if (mustPromote) {
-        moves[idx++] = encodeMove(sq, to, true, false, pt, captured);
-      } else {
-        moves[idx++] = encodeMove(sq, to, false, false, pt, captured);
-        if (canPromote) {
-          moves[idx++] = encodeMove(sq, to, true, false, pt, captured);
-        }
-      }
     }
   }
 
@@ -123,7 +126,7 @@ export function generateMoves(game: ShogiGame, moves: Int32Array): number {
       if (pt === KEI) {
         if ((side === 0 && r <= 1) || (side === 1 && r >= 7)) continue;
       }
-      
+
       if (pt === FU && fuCols & (1 << c)) continue;
 
       moves[idx++] = encodeMove(127, sq, false, true, pt, 0);
