@@ -44,6 +44,16 @@ export interface SearchResult {
 
 export type GameMode = 'pvp' | 'ai';
 
+export type TimeControl = 10 | 30 | 60;
+
+export interface GameSettings {
+  mode: GameMode;
+  aiSide?: Side; // AI戦の場合、AIの手番（undefined = 対人戦）
+  timeControl: TimeControl; // 1手あたりの持ち時間（秒）
+}
+
+export type GameResult = 'sente_win' | 'gote_win' | 'sente_timeout' | 'gote_timeout' | 'sente_resign' | 'gote_resign' | null;
+
 export const PIECE_CHARS = [
   '', '歩', '香', '桂', '銀', '金', '角', '飛', '王',
   'と', '杏', '圭', '全', '馬', '龍', '象', '太'
