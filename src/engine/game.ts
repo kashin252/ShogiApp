@@ -107,7 +107,7 @@ export class ShogiGame {
 
   applyMove(encodedMove: number): boolean {
     makeMove(this, encodedMove);
-    
+
     if (this.turn === 0) {
       this.moveCount++;
     }
@@ -116,7 +116,7 @@ export class ShogiGame {
     const moves = new Int32Array(512);
     const cnt = generateMoves(this, moves);
     let hasLegal = false;
-    
+
     for (let i = 0; i < cnt; i++) {
       makeMove(this, moves[i]);
       if (!isInCheck(this, 1 - this.turn)) {
@@ -140,7 +140,7 @@ export class ShogiGame {
       const moves = new Int32Array(512);
       const cnt = generateMoves(this, moves);
       const legal: number[] = [];
-      
+
       for (let i = 0; i < cnt; i++) {
         makeMove(this, moves[i]);
         if (!isInCheck(this, 1 - this.turn)) {
@@ -169,12 +169,12 @@ export class ShogiGame {
 
     for (let i = 0; i < cnt; i++) {
       const m = moves[i];
-      
+
       // フィルタ
       if (from !== undefined) {
         if (decodeDrop(m) || decodeFrom(m) !== from) continue;
       }
-      
+
       if (dropPiece !== undefined) {
         if (!decodeDrop(m) || decodePiece(m) !== dropPiece) continue;
       }
@@ -187,5 +187,36 @@ export class ShogiGame {
     }
 
     return legal;
+  }
+
+  undo(): boolean {
+    if (this.historyIdx === 0) return false;
+
+    // 履歴から最後の手を取得
+    const move = this.moveHistory[this.historyIdx - 1];
+
+    // 現在の手番を保存（unmakeMoveで変わるため）
+    const currentTurn = this.turn;
+
+    // 盤面を戻す
+    unmakeMove(this, move);
+
+    // カウンタを戻す
+    // 元が後手番(1)なら、直前は先手が指したので moveCount を減らす
+    if (currentTurn === 1) {
+      this.moveCount--;
+    }
+
+    this.gameOver = false; // ゲーム終了状態も解除
+
+    // 最終手位置を更新（一つ前の手があればそれを使う）
+    if (this.historyIdx > 0) {
+      const prevMove = this.moveHistory[this.historyIdx - 1];
+      this.lastMovePos = decodeTo(prevMove);
+    } else {
+      this.lastMovePos = -1;
+    }
+
+    return true;
   }
 }

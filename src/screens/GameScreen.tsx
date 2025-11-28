@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,15 +11,29 @@ import {
 } from 'react-native';
 import { Board } from '../components/Board';
 import { CapturedPieces } from '../components/CapturedPieces';
+import { PlayLimitModal } from '../components/PlayLimitModal';
+import { PromoteModal } from '../components/PromoteModal';
+import { Dropdown } from '../components/Dropdown';
+import { InfoModal } from '../components/InfoModal';
+import { PremiumScreen } from './PremiumScreen';
 import { useGame } from '../hooks/useGame';
-import { GameSettings, TimeControl } from '../types/game.types';
+import { GameSettings, TimeControl, GameResult } from '../types/game.types';
+import i18n from '../i18n/translations';
 import { colors } from '../styles/colors';
 import { decodeTo, decodePromote } from '../engine/move';
+import { StorageService } from '../services/StorageService';
+import { AdService } from '../services/AdService';
+import { PurchaseService } from '../services/PurchaseService';
 
 export const GameScreen: React.FC = () => {
   const [isFlipped, setIsFlipped] = useState(false);
-  const [showNewGameModal, setShowNewGameModal] = useState(true);
+  const [showNewGameModal, setShowNewGameModal] = useState(false);
   const [showResignModal, setShowResignModal] = useState(false);
+  const [showPlayLimitModal, setShowPlayLimitModal] = useState(false);
+  const [showPremiumScreen, setShowPremiumScreen] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
+  const [remainingPlays, setRemainingPlays] = useState(3);
 
   // 新規対局の設定
   const [newGameSettings, setNewGameSettings] = useState<GameSettings>({
@@ -41,9 +55,63 @@ export const GameScreen: React.FC = () => {
     getLegalMoves,
     resetGame,
     resign,
+    undo,
   } = useGame(newGameSettings);
 
   const [legalMoves, setLegalMoves] = useState<number[]>([]);
+
+  // 成り選択用
+  const [showPromoteModal, setShowPromoteModal] = useState(false);
+  const [pendingPromoteMoves, setPendingPromoteMoves] = useState<number[]>([]);
+
+  // 初期化: プレミアム状態とサービスの初期化
+  useEffect(() => {
+    initializeServices();
+  }, []);
+
+  const initializeServices = async () => {
+    try {
+      // 開発環境の場合はデータをリセット
+      await StorageService.initForDev();
+
+      // プレミアム状態をチェック
+      const premium = await StorageService.isPremium();
+      setIsPremium(premium);
+
+      // 残りプレイ回数を取得
+      const remaining = await StorageService.getRemainingPlays();
+      setRemainingPlays(remaining);
+    } catch (error) {
+      console.error('Failed to initialize storage:', error);
+    }
+
+    // 広告とIAPを初期化（エラーが発生しても続行）
+    try {
+      await AdService.initAds();
+    } catch (error) {
+      console.error('Failed to initialize ads:', error);
+    }
+
+    try {
+      await PurchaseService.initIAP();
+    } catch (error) {
+      console.error('Failed to initialize IAP:', error);
+    }
+  };
+
+  // プレミアム状態が変わったら再チェック
+  useEffect(() => {
+    if (showPremiumScreen === false) {
+      checkPremiumStatus();
+    }
+  }, [showPremiumScreen]);
+
+  const checkPremiumStatus = async () => {
+    const premium = await StorageService.isPremium();
+    setIsPremium(premium);
+    const remaining = await StorageService.getRemainingPlays();
+    setRemainingPlays(remaining);
+  };
 
   const handleSquarePress = (sq: number) => {
     if (gameState.gameOver) return;
@@ -71,14 +139,15 @@ export const GameScreen: React.FC = () => {
 
       if (targetMoves.length > 0) {
         if (targetMoves.length === 2) {
-          const promoteMove = targetMoves.find((m) => decodePromote(m));
-          makeMove(promoteMove || targetMoves[0]);
+          // 成るか成らないかの選択が必要
+          setPendingPromoteMoves(targetMoves);
+          setShowPromoteModal(true);
         } else {
+          // 選択肢がない場合（強制的に成る、または成れない）
           makeMove(targetMoves[0]);
+          setSelection(null);
+          setLegalMoves([]);
         }
-
-        setSelection(null);
-        setLegalMoves([]);
         return;
       }
     }
@@ -94,6 +163,27 @@ export const GameScreen: React.FC = () => {
     }
   };
 
+  const handlePromoteSelect = (shouldPromote: boolean) => {
+    if (pendingPromoteMoves.length === 0) {
+      setShowPromoteModal(false);
+      return;
+    }
+
+    const move = pendingPromoteMoves.find((m) => decodePromote(m) === shouldPromote);
+
+    if (move) {
+      makeMove(move);
+    } else {
+      // フォールバック（通常ありえないが、念のため）
+      makeMove(pendingPromoteMoves[0]);
+    }
+
+    setShowPromoteModal(false);
+    setPendingPromoteMoves([]);
+    setSelection(null);
+    setLegalMoves([]);
+  };
+
   const handleHandPress = (side: 0 | 1, piece: number) => {
     if (gameState.gameOver || side !== gameState.turn) return;
     if (settings.mode === 'ai' && gameState.turn === settings.aiSide) return;
@@ -103,9 +193,41 @@ export const GameScreen: React.FC = () => {
     setLegalMoves(legal.map((m) => decodeTo(m)));
   };
 
-  const startNewGame = () => {
+  const startNewGame = async () => {
+    // プレイ回数制限をチェック
+    const canPlay = await StorageService.canPlay();
+
+    if (!canPlay) {
+      setShowNewGameModal(false);
+      setShowPlayLimitModal(true);
+      return;
+    }
+
+    // 無料版の場合、広告を表示
+    if (!isPremium) {
+      const adShown = await AdService.showInterstitialAd();
+      if (adShown) {
+        // 広告が表示された場合、少し待ってから対局開始
+        setTimeout(() => {
+          startGameAfterAd();
+        }, 500);
+      } else {
+        // 広告が表示できなかった場合はそのまま開始
+        startGameAfterAd();
+      }
+    } else {
+      startGameAfterAd();
+    }
+  };
+
+  const startGameAfterAd = async () => {
     setShowNewGameModal(false);
     resetGame(newGameSettings);
+
+    // プレイ回数をインクリメント
+    await StorageService.incrementPlayCount();
+    const remaining = await StorageService.getRemainingPlays();
+    setRemainingPlays(remaining);
   };
 
   const handleResign = () => {
@@ -114,34 +236,28 @@ export const GameScreen: React.FC = () => {
   };
 
   // 結果メッセージの取得
-  const getResultMessage = (): string => {
-    if (!gameResult) {
-      if (gameState.gameOver) {
-        return `${gameState.turn === 0 ? '後手' : '先手'}の勝ち`;
-      }
-      return '';
-    }
-
-    switch (gameResult) {
+  const getResultText = (result: GameResult) => {
+    switch (result) {
       case 'sente_win':
-        return '先手の勝ち';
+        return i18n.t('result.senteWin');
       case 'gote_win':
-        return '後手の勝ち';
+        return i18n.t('result.goteWin');
       case 'sente_timeout':
-        return '先手時間切れ - 後手の勝ち';
+        return `${i18n.t('turn.sente')} ${i18n.t('result.timeout')} - ${i18n.t('result.goteWin')}`;
       case 'gote_timeout':
-        return '後手時間切れ - 先手の勝ち';
+        return `${i18n.t('turn.gote')} ${i18n.t('result.timeout')} - ${i18n.t('result.senteWin')}`;
       case 'sente_resign':
-        return '先手投了 - 後手の勝ち';
+        return `${i18n.t('turn.sente')} ${i18n.t('result.resign')} - ${i18n.t('result.goteWin')}`;
       case 'gote_resign':
-        return '後手投了 - 先手の勝ち';
+        return `${i18n.t('turn.gote')} ${i18n.t('result.resign')} - ${i18n.t('result.senteWin')}`;
       default:
         return '';
     }
   };
 
-  // 時間をフォーマット
-  const formatTime = (seconds: number): string => {
+  // Format time (seconds) to MM:SS
+  const formatTime = (seconds: number) => {
+    if (seconds === 0 && settings.timeControl === 0) return i18n.t('time.unlimited');
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -151,24 +267,53 @@ export const GameScreen: React.FC = () => {
   const topHandSide = isFlipped ? 0 : 1;
   const bottomHandSide = isFlipped ? 1 : 0;
 
+  const handleUndo = () => {
+    if (isPremium) {
+      undo();
+    } else {
+      setShowPremiumScreen(true);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>🎴 将棋アプリ</Text>
+          <View>
+            <Text style={styles.title}>{i18n.t('appTitle')}</Text>
+            <Text style={styles.subTitle}>
+              {settings.mode === 'pvp' ? i18n.t('gameMode.pvp') : i18n.t('gameMode.ai')}
+            </Text>
+          </View>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity
+              style={styles.infoButton}
+              onPress={() => setShowInfoModal(true)}
+            >
+              <Text style={styles.infoButtonText}>ⓘ</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.premiumButton, isPremium && styles.premiumButtonActive]}
+              onPress={() => setShowPremiumScreen(true)}
+            >
+              <Text style={[styles.premiumButtonText, isPremium && styles.premiumButtonTextActive]}>
+                {isPremium ? i18n.t('modals.premium.subscribed') : i18n.t('modals.premium.remaining', { count: remainingPlays })}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.statusPanel}>
           {isThinking ? (
             <View style={styles.thinkingPanel}>
               <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={styles.statusText}>AI思考中...</Text>
+              <Text style={styles.statusText}>{i18n.t('status.thinking')}</Text>
             </View>
           ) : gameState.gameOver || gameResult ? (
-            <Text style={styles.statusText}>{getResultMessage()}</Text>
+            <Text style={styles.statusText}>{getResultText(gameResult)}</Text>
           ) : (
             <Text style={styles.statusText}>
-              {`${gameState.turn === 0 ? '先手' : '後手'}の番`}
+              {`${gameState.turn === 0 ? i18n.t('turn.sente') : i18n.t('turn.gote')}${i18n.t('turn.suffix')}`}
             </Text>
           )}
 
@@ -176,10 +321,10 @@ export const GameScreen: React.FC = () => {
           {settings.mode === 'ai' && searchResult && (
             <View style={styles.searchInfo}>
               <Text style={styles.searchInfoText}>
-                深さ: {searchResult.depth} | 評価値: {searchResult.score > 0 ? '+' : ''}{searchResult.score}
+                {i18n.t('search.depth')}: {searchResult.depth} | {i18n.t('search.score')}: {searchResult.score > 0 ? '+' : ''}{searchResult.score}
               </Text>
               <Text style={styles.searchInfoText}>
-                探索局面数: {searchResult.nodes.toLocaleString()} | 時間: {searchResult.time}ms
+                {i18n.t('search.nodes')}: {searchResult.nodes.toLocaleString()} | {i18n.t('search.time')}: {searchResult.time}ms
               </Text>
             </View>
           )}
@@ -189,7 +334,7 @@ export const GameScreen: React.FC = () => {
           {/* Top Section: Timer + Hand (Horizontal) */}
           <View style={styles.playerSection}>
             <View style={[styles.timerBox, gameState.turn === topHandSide && styles.timerActive]}>
-              <Text style={styles.timerLabel}>{topHandSide === 0 ? '先手' : '後手'}</Text>
+              <Text style={styles.timerLabel}>{topHandSide === 0 ? i18n.t('turn.sente') : i18n.t('turn.gote')}</Text>
               <Text style={styles.timerText}>
                 {formatTime(topHandSide === 0 ? senteTime : goteTime)}
               </Text>
@@ -205,7 +350,7 @@ export const GameScreen: React.FC = () => {
                     : null
                 }
                 onPiecePress={(p) => handleHandPress(topHandSide, p)}
-                title={topHandSide === 0 ? "先手持ち駒" : "後手持ち駒"}
+                title={topHandSide === 0 ? i18n.t('hand.sente') : i18n.t('hand.gote')}
               />
             </View>
           </View>
@@ -221,34 +366,35 @@ export const GameScreen: React.FC = () => {
             />
           </View>
 
-          {/* Bottom Section: Hand + Timer (Horizontal) */}
+          {/* Sente Hand & Timer */}
           <View style={styles.playerSection}>
-            <View style={[styles.timerBox, gameState.turn === bottomHandSide && styles.timerActive]}>
-              <Text style={styles.timerLabel}>{bottomHandSide === 0 ? '先手' : '後手'}</Text>
-              <Text style={styles.timerText}>
-                {formatTime(bottomHandSide === 0 ? senteTime : goteTime)}
-              </Text>
+            <View style={[styles.timerBox, gameState.turn === 0 && !gameResult && styles.timerActive]}>
+              <Text style={styles.timerLabel}>{i18n.t('turn.sente')}</Text>
+              <Text style={styles.timerText}>{formatTime(senteTime)}</Text>
             </View>
-
             <View style={styles.handContainer}>
               <CapturedPieces
-                hand={gameState.hand[bottomHandSide]}
-                side={bottomHandSide}
+                hand={gameState.hand[0]}
+                side={0}
                 selectedPiece={
-                  selection && selection.drop && selection.drop.side === bottomHandSide
+                  selection && selection.drop && selection.drop.side === 0
                     ? selection.drop.piece
                     : null
                 }
-                onPiecePress={(p) => handleHandPress(bottomHandSide, p)}
-                title={bottomHandSide === 0 ? "先手持ち駒" : "後手持ち駒"}
+                onPiecePress={(p) => handleHandPress(0, p)}
+                title={i18n.t('hand.sente')}
               />
             </View>
           </View>
         </View>
 
+        {/* Footer Controls */}
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.button} onPress={() => setShowNewGameModal(true)}>
-            <Text style={styles.buttonText}>新規対局</Text>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => setShowNewGameModal(true)}
+          >
+            <Text style={styles.buttonText}>{i18n.t('buttons.newGame')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -256,14 +402,22 @@ export const GameScreen: React.FC = () => {
             onPress={() => setShowResignModal(true)}
             disabled={gameState.gameOver || !!gameResult}
           >
-            <Text style={styles.buttonText}>投了</Text>
+            <Text style={styles.buttonText}>{i18n.t('buttons.resign')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.button, styles.rotateBtn]}
             onPress={() => setIsFlipped(!isFlipped)}
           >
-            <Text style={styles.buttonText}>盤面反転</Text>
+            <Text style={styles.buttonText}>{i18n.t('buttons.rotate')}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: '#888', marginLeft: 8 }]}
+            onPress={handleUndo}
+            disabled={isThinking || gameState.moveCount === 0}
+          >
+            <Text style={styles.buttonText}>{i18n.t('buttons.undo')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -271,7 +425,7 @@ export const GameScreen: React.FC = () => {
         <Modal
           visible={showNewGameModal}
           transparent={true}
-          animationType="fade"
+          animationType="slide"
           onRequestClose={() => setShowNewGameModal(false)}
         >
           <View style={styles.modalOverlay}>
@@ -280,130 +434,71 @@ export const GameScreen: React.FC = () => {
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>新規対局</Text>
+                <Text style={styles.modalTitle}>{i18n.t('modals.newGame.title')}</Text>
 
                 {/* モード選択 */}
-                <Text style={styles.sectionLabel}>対局モード</Text>
-                <View style={styles.optionRow}>
-                  <TouchableOpacity
-                    style={[
-                      styles.optionButton,
-                      newGameSettings.mode === 'pvp' && styles.optionButtonSelected,
-                    ]}
-                    onPress={() =>
-                      setNewGameSettings({ ...newGameSettings, mode: 'pvp', aiSide: undefined })
+                <Dropdown
+                  label={i18n.t('modals.newGame.mode')}
+                  value={newGameSettings.mode}
+                  options={[
+                    { label: i18n.t('gameMode.pvp'), value: 'pvp' },
+                    { label: i18n.t('gameMode.ai'), value: 'ai' },
+                  ]}
+                  onSelect={(value) => {
+                    if (value === 'pvp') {
+                      setNewGameSettings({ ...newGameSettings, mode: 'pvp', aiSide: undefined });
+                    } else {
+                      // AI戦に切り替える際、持ち時間が無制限(0)なら30秒に変更
+                      const newTime = newGameSettings.timeControl === 0 ? 30 : newGameSettings.timeControl;
+                      setNewGameSettings({
+                        ...newGameSettings,
+                        mode: 'ai',
+                        aiSide: 1,
+                        timeControl: newTime
+                      });
                     }
-                  >
-                    <Text
-                      style={[
-                        styles.optionButtonText,
-                        newGameSettings.mode === 'pvp' && styles.optionButtonTextSelected,
-                      ]}
-                    >
-                      対人戦
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.optionButton,
-                      newGameSettings.mode === 'ai' && styles.optionButtonSelected,
-                    ]}
-                    onPress={() =>
-                      setNewGameSettings({ ...newGameSettings, mode: 'ai', aiSide: 1 })
-                    }
-                  >
-                    <Text
-                      style={[
-                        styles.optionButtonText,
-                        newGameSettings.mode === 'ai' && styles.optionButtonTextSelected,
-                      ]}
-                    >
-                      対AI戦
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                  }}
+                />
 
                 {/* AI戦の手番選択 */}
                 {newGameSettings.mode === 'ai' && (
-                  <>
-                    <Text style={styles.sectionLabel}>あなたの手番</Text>
-                    <View style={styles.optionRow}>
-                      <TouchableOpacity
-                        style={[
-                          styles.optionButton,
-                          newGameSettings.aiSide === 1 && styles.optionButtonSelected,
-                        ]}
-                        onPress={() => setNewGameSettings({ ...newGameSettings, aiSide: 1 })}
-                      >
-                        <Text
-                          style={[
-                            styles.optionButtonText,
-                            newGameSettings.aiSide === 1 && styles.optionButtonTextSelected,
-                          ]}
-                        >
-                          先手
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[
-                          styles.optionButton,
-                          newGameSettings.aiSide === 0 && styles.optionButtonSelected,
-                        ]}
-                        onPress={() => setNewGameSettings({ ...newGameSettings, aiSide: 0 })}
-                      >
-                        <Text
-                          style={[
-                            styles.optionButtonText,
-                            newGameSettings.aiSide === 0 && styles.optionButtonTextSelected,
-                          ]}
-                        >
-                          後手
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
+                  <Dropdown
+                    label={i18n.t('modals.newGame.aiSide')}
+                    value={newGameSettings.aiSide}
+                    options={[
+                      { label: i18n.t('turn.sente'), value: 1 },
+                      { label: i18n.t('turn.gote'), value: 0 },
+                    ]}
+                    onSelect={(value) => setNewGameSettings({ ...newGameSettings, aiSide: value })}
+                  />
                 )}
 
                 {/* 持ち時間選択 */}
-                <Text style={styles.sectionLabel}>持ち時間（1手あたり）</Text>
-                <View style={styles.optionRow}>
-                  {([10, 30, 60] as TimeControl[]).map((time) => (
-                    <TouchableOpacity
-                      key={time}
-                      style={[
-                        styles.optionButton,
-                        styles.timeButton,
-                        newGameSettings.timeControl === time && styles.optionButtonSelected,
-                      ]}
-                      onPress={() => setNewGameSettings({ ...newGameSettings, timeControl: time })}
-                    >
-                      <Text
-                        style={[
-                          styles.optionButtonText,
-                          newGameSettings.timeControl === time && styles.optionButtonTextSelected,
-                        ]}
-                      >
-                        {time}秒
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <Dropdown
+                  label={i18n.t('modals.newGame.timeControl')}
+                  value={newGameSettings.timeControl}
+                  options={[
+                    ...(newGameSettings.mode === 'pvp' ? [{ label: i18n.t('time.unlimited'), value: 0 }] : []),
+                    { label: `10${i18n.t('time.seconds')}`, value: 10 },
+                    { label: `30${i18n.t('time.seconds')}`, value: 30 },
+                    { label: `60${i18n.t('time.seconds')}`, value: 60 },
+                  ]}
+                  onSelect={(value) => setNewGameSettings({ ...newGameSettings, timeControl: value })}
+                />
 
                 {/* 開始・キャンセルボタン */}
                 <TouchableOpacity style={styles.modalButton} onPress={startNewGame}>
-                  <Text style={styles.modalButtonText}>対局開始</Text>
+                  <Text style={styles.modalButtonText}>
+                    {newGameSettings.mode === 'pvp' ? i18n.t('modals.newGame.startPvp') : i18n.t('modals.newGame.startAi')}
+                  </Text>
                 </TouchableOpacity>
 
-                {!showNewGameModal && (
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.modalCancelButton]}
-                    onPress={() => setShowNewGameModal(false)}
-                  >
-                    <Text style={styles.modalCancelButtonText}>キャンセル</Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalCancelButton]}
+                  onPress={() => setShowNewGameModal(false)}
+                >
+                  <Text style={styles.modalCancelButtonText}>{i18n.t('buttons.cancel')}</Text>
+                </TouchableOpacity>
               </View>
             </ScrollView>
           </View>
@@ -418,26 +513,62 @@ export const GameScreen: React.FC = () => {
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>投了確認</Text>
+              <Text style={styles.modalTitle}>{i18n.t('modals.resign.title')}</Text>
               <Text style={styles.modalMessage}>
-                {gameState.turn === 0 ? '先手' : '後手'}が投了します。よろしいですか?
+                {gameState.turn === 0 ? i18n.t('turn.sente') : i18n.t('turn.gote')}{i18n.t('modals.resign.message')}
               </Text>
 
               <TouchableOpacity style={styles.modalButton} onPress={handleResign}>
-                <Text style={styles.modalButtonText}>投了する</Text>
+                <Text style={styles.modalButtonText}>{i18n.t('modals.resign.confirm')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalCancelButton]}
                 onPress={() => setShowResignModal(false)}
               >
-                <Text style={styles.modalCancelButtonText}>キャンセル</Text>
+                <Text style={styles.modalCancelButtonText}>{i18n.t('buttons.cancel')}</Text>
               </TouchableOpacity>
             </View>
           </View>
         </Modal>
-      </View>
-    </SafeAreaView>
+
+        {/* Play Limit Modal */}
+        <InfoModal
+          visible={showInfoModal}
+          onClose={() => setShowInfoModal(false)}
+        />
+
+        <PlayLimitModal
+          visible={showPlayLimitModal}
+          remainingPlays={remainingPlays}
+          onClose={() => setShowPlayLimitModal(false)}
+          onUpgrade={() => {
+            setShowPlayLimitModal(false);
+            setShowPremiumScreen(true);
+          }}
+        />
+
+        {/* Premium Screen */}
+        {
+          showPremiumScreen && (
+            <Modal
+              visible={showPremiumScreen}
+              animationType="slide"
+              presentationStyle="fullScreen"
+            >
+              <PremiumScreen onClose={() => setShowPremiumScreen(false)} />
+            </Modal>
+          )
+        }
+
+        {/* Promote Selection Modal */}
+        <PromoteModal
+          visible={showPromoteModal}
+          onPromote={() => handlePromoteSelect(true)}
+          onCancel={() => handlePromoteSelect(false)}
+        />
+      </View >
+    </SafeAreaView >
   );
 };
 
@@ -448,19 +579,41 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    padding: 16,
+    padding: 4,
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   header: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     width: '100%',
+    marginBottom: 8,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: colors.primaryDark,
-    marginBottom: 8,
+  },
+  premiumButton: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  premiumButtonActive: {
+    backgroundColor: '#fff3cd',
+    borderColor: colors.primary,
+  },
+  premiumButtonText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#666',
+  },
+  premiumButtonTextActive: {
+    color: colors.primary,
   },
   statusPanel: {
     marginVertical: 4,
@@ -476,8 +629,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text,
   },
+  subTitle: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  infoButton: {
+    marginRight: 12,
+    padding: 8,
+  },
+  infoButtonText: {
+    fontSize: 24,
+    color: colors.primary,
+  },
   searchInfo: {
-    marginTop: 8,
+    marginTop: 4,
     alignItems: 'center',
   },
   searchInfoText: {
@@ -530,16 +700,19 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
     marginBottom: 8,
+    width: '100%',
+    paddingHorizontal: 4,
   },
   button: {
     backgroundColor: colors.primary,
-    paddingHorizontal: 16,
+    paddingHorizontal: 4,
     paddingVertical: 12,
     borderRadius: 8,
-    minWidth: 100,
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   resignBtn: {
     backgroundColor: '#dc3545',
@@ -549,8 +722,9 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
   // Modal Styles
   modalOverlay: {
@@ -614,8 +788,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   timeButton: {
-    flex: 0,
-    minWidth: 70,
+    flex: 1,
   },
   optionButtonSelected: {
     backgroundColor: colors.primary,
@@ -628,6 +801,50 @@ const styles = StyleSheet.create({
   },
   optionButtonTextSelected: {
     color: '#fff',
+  },
+  optionColumn: {
+    flexDirection: 'column',
+    gap: 12,
+    marginBottom: 8,
+  },
+  radioOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  radioOptionSelected: {
+    backgroundColor: '#fff',
+    borderColor: colors.primary,
+  },
+  radioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#999',
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioCircleSelected: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.primary,
+  },
+  radioText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  radioTextSelected: {
+    color: colors.primary,
+    fontWeight: 'bold',
   },
   modalButton: {
     width: '100%',

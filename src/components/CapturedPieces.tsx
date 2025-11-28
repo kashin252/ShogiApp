@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
 import { colors } from '../styles/colors';
-import { PIECE_CHARS, FU, KYO, KEI, GIN, KIN, KAKU, HI } from '../types/game.types';
+import { PIECE_CHARS, PIECE_CHARS_EN, FU, KYO, KEI, GIN, KIN, KAKU, HI } from '../types/game.types';
+import i18n from '../i18n/translations';
 
 interface CapturedPiecesProps {
   hand: Int8Array;
@@ -42,7 +43,7 @@ export const CapturedPieces: React.FC<CapturedPiecesProps> = ({
               onPress={() => onPiecePress(pt)}
             >
               <Text style={styles.pieceText}>
-                {PIECE_CHARS[pt]}
+                {i18n.locale.startsWith('en') ? PIECE_CHARS_EN[pt] : PIECE_CHARS[pt]}
               </Text>
               {cnt > 1 && (
                 <View style={styles.badge}>

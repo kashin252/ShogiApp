@@ -44,7 +44,7 @@ export interface SearchResult {
 
 export type GameMode = 'pvp' | 'ai';
 
-export type TimeControl = 10 | 30 | 60;
+export type TimeControl = 0 | 10 | 30 | 60;
 
 export interface GameSettings {
   mode: GameMode;
@@ -59,7 +59,37 @@ export const PIECE_CHARS = [
   'と', '杏', '圭', '全', '馬', '龍', '象', '太'
 ];
 
+export const PIECE_CHARS_EN = [
+  '', 'P', 'L', 'N', 'S', 'G', 'B', 'R', 'K',
+  '+P', '+L', '+N', '+S', '+B', '+R', 'DE', 'CP'
+];
+
 export const PIECE_VALUES = [
   0, 90, 315, 405, 495, 540, 855, 990, 15000,
   540, 540, 540, 540, 1125, 1395, 900, 950
 ];
+
+// 収益化機能用の型定義
+
+// プレミアム状態
+export interface PremiumStatus {
+  isPremium: boolean;
+  purchaseDate?: string;
+  productId?: string;
+}
+
+// プレイ制限情報
+export interface PlayLimitInfo {
+  playCount: number;
+  maxPlays: number;
+  lastPlayDate: string;
+  canPlay: boolean;
+  remainingPlays: number;
+}
+
+// 広告状態
+export interface AdStatus {
+  isLoaded: boolean;
+  isShowing: boolean;
+  lastShownDate?: string;
+}

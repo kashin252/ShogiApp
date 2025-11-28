@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Text, Dimensions } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Text, Dimensions, ImageBackground, Platform } from 'react-native';
 import { colors } from '../styles/colors';
-import { PIECE_CHARS } from '../types/game.types';
+import { PIECE_CHARS, PIECE_CHARS_EN } from '../types/game.types';
+import i18n from '../i18n/translations';
 
 interface BoardProps {
   board: Int8Array;
@@ -12,8 +13,8 @@ interface BoardProps {
 }
 
 const { width, height } = Dimensions.get('window');
-const BOARD_PADDING = 16;
-const OTHER_UI_HEIGHT = 320; // Approx height for header, captured pieces, buttons, margins
+const BOARD_PADDING = 4;
+const OTHER_UI_HEIGHT = 380; // Approx height for header, captured pieces, buttons, margins
 
 // Ensure the board fits within the screen width AND height
 const MAX_BOARD_WIDTH = Math.min(width - BOARD_PADDING * 2, 400);
@@ -56,15 +57,19 @@ export const Board: React.FC<BoardProps> = ({
       >
         {isLegalMove && <View style={styles.legalDot} />}
         {v !== 0 && (
-          <Text
-            style={[
-              styles.piece,
-              !isSente && styles.pieceRotated,
-              pt >= 9 && styles.piecePromoted,
-            ]}
-          >
-            {PIECE_CHARS[pt]}
-          </Text>
+          <View style={[
+            styles.pieceContainer,
+            !isSente && styles.pieceRotatedContainer
+          ]}>
+            <Text
+              style={[
+                styles.piece,
+                pt >= 9 && styles.piecePromoted,
+              ]}
+            >
+              {i18n.locale.startsWith('en') ? PIECE_CHARS_EN[pt] : PIECE_CHARS[pt]}
+            </Text>
+          </View>
         )}
       </TouchableOpacity>
     );
@@ -83,9 +88,13 @@ export const Board: React.FC<BoardProps> = ({
 
   return (
     <View style={styles.boardContainer}>
-      <View style={styles.board}>
+      <ImageBackground
+        source={require('../../assets/board_texture.png')}
+        style={styles.board}
+        imageStyle={{ borderRadius: 2 }}
+      >
         {Array.from({ length: 9 }, (_, i) => renderRow(i))}
-      </View>
+      </ImageBackground>
     </View>
   );
 };
@@ -95,14 +104,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 2,
-    backgroundColor: colors.boardBg,
+    backgroundColor: '#333', // Dark border around the board
+    borderRadius: 4,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   board: {
     width: BOARD_SIZE,
     height: BOARD_SIZE,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: '#000',
-    backgroundColor: colors.boardBg,
   },
   row: {
     flexDirection: 'row',
@@ -112,37 +126,54 @@ const styles = StyleSheet.create({
     width: SQUARE_SIZE,
     height: SQUARE_SIZE,
     borderWidth: 0.5,
-    borderColor: colors.boardBorder,
+    borderColor: 'rgba(0,0,0,0.3)', // Semi-transparent grid
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
   },
   selected: {
-    backgroundColor: colors.selectedSquare,
+    backgroundColor: 'rgba(255, 255, 0, 0.3)', // Highlight with transparency
   },
   lastMove: {
-    backgroundColor: colors.lastMove,
+    backgroundColor: 'rgba(255, 165, 0, 0.3)', // Highlight with transparency
   },
   legalDot: {
     position: 'absolute',
-    width: SQUARE_SIZE * 0.25,
-    height: SQUARE_SIZE * 0.25,
-    borderRadius: SQUARE_SIZE * 0.125,
-    backgroundColor: colors.legalMove,
+    width: SQUARE_SIZE * 0.2,
+    height: SQUARE_SIZE * 0.2,
+    borderRadius: SQUARE_SIZE * 0.1,
+    backgroundColor: 'rgba(0, 100, 0, 0.5)',
     zIndex: 1,
-    opacity: 0.6,
+  },
+  pieceContainer: {
+    width: '90%',
+    height: '90%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f0c36d', // Wood color for piece
+    borderRadius: 4,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 1,
+    // Slightly pentagon-ish shape using border trick is hard, stick to rounded rect for now
+    borderBottomWidth: 2,
+    borderBottomColor: '#d0a34d',
   },
   piece: {
-    fontSize: SQUARE_SIZE * 0.6,
+    fontSize: SQUARE_SIZE * 0.65,
     fontWeight: 'bold',
-    color: colors.pieceSente,
+    color: '#000',
     textAlign: 'center',
-    lineHeight: SQUARE_SIZE * 0.7, // Adjust line height to center vertically better if needed
+    fontFamily: Platform.OS === 'ios' ? 'Hiragino Mincho ProN' : 'serif',
+    includeFontPadding: false,
+    lineHeight: SQUARE_SIZE * 0.7,
   },
-  pieceRotated: {
+  pieceRotatedContainer: {
     transform: [{ rotate: '180deg' }],
   },
   piecePromoted: {
-    color: colors.piecePromoted,
+    color: '#d00', // Red for promoted
   },
 });

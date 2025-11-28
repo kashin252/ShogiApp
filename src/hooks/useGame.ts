@@ -33,6 +33,9 @@ export function useGame(initialSettings: GameSettings) {
   const startTimer = useCallback(() => {
     clearTimer();
 
+    // 時間無制限の場合はタイマーを動かさない
+    if (settings.timeControl === 0) return;
+
     timerRef.current = setInterval(() => {
       if (game.gameOver || gameResult) {
         clearTimer();
@@ -83,8 +86,8 @@ export function useGame(initialSettings: GameSettings) {
       setTimeout(async () => {
         setIsThinking(true);
 
-        // AIの思考時間を持ち時間の40%に制限（タイムアウト防止）
-        const aiThinkTime = Math.min(newSettings.timeControl * 400, newSettings.timeControl * 400);
+        // AIの思考時間を持ち時間の90%に設定（一手ごとにリセットされるため）
+        const aiThinkTime = newSettings.timeControl * 900;
         const result = await game.findBestMove(aiThinkTime);
         setSearchResult(result);
 
@@ -113,6 +116,49 @@ export function useGame(initialSettings: GameSettings) {
     updateState();
   }, [game, clearTimer, updateState]);
 
+  // 待った処理
+  const undo = useCallback(() => {
+    if (isThinking) return; // AI思考中は不可
+
+    if (settings.mode === 'pvp') {
+      // 対人戦は1手戻す
+      if (game.undo()) {
+        clearTimer();
+        setGameResult(null); // 決着がついていても戻す
+
+        // 手番の時間をリセット
+        if (game.turn === 0) {
+          setSenteTime(settings.timeControl);
+        } else {
+          setGoteTime(settings.timeControl);
+        }
+
+        updateState();
+        startTimer();
+      }
+    } else {
+      // AI戦は2手戻す（自分の手番に戻す）
+      // ただし、AIが先手でまだ初手の場合は何もしない、あるいは自分が後手でAIが指した直後なら1手戻すなど調整が必要
+      // 基本的に「自分の手番」に戻すことを目指す
+
+      // 1手戻す（AIの手を戻す）
+      if (game.undo()) {
+        // さらにもう1手戻す（自分の手を戻す）
+        game.undo();
+
+        clearTimer();
+        setGameResult(null);
+
+        // 自分の手番の時間だけリセットすれば良いが、念のため両方リセット
+        setSenteTime(settings.timeControl);
+        setGoteTime(settings.timeControl);
+
+        updateState();
+        startTimer();
+      }
+    }
+  }, [game, settings, isThinking, clearTimer, startTimer, updateState]);
+
   const makeMove = useCallback(
     async (encodedMove: number) => {
       const success = game.applyMove(encodedMove);
@@ -123,7 +169,12 @@ export function useGame(initialSettings: GameSettings) {
         clearTimer();
         setGameResult(game.turn === 0 ? 'gote_win' : 'sente_win');
       } else {
-        // 手が進んだらタイマーを再スタート
+        // 手が進んだら次の手番の持ち時間をリセット
+        if (game.turn === 0) {
+          setSenteTime(settings.timeControl);
+        } else {
+          setGoteTime(settings.timeControl);
+        }
         startTimer();
       }
 
@@ -135,23 +186,37 @@ export function useGame(initialSettings: GameSettings) {
         setIsThinking(true);
 
         setTimeout(async () => {
-          // AIの思考時間を持ち時間の40%に制限（タイムアウト防止）
-          const currentTime = settings.aiSide === 1 ? goteTime : senteTime;
-          const aiThinkTime = Math.min(settings.timeControl * 400, currentTime * 400);
+          // AIの思考時間を持ち時間の90%に設定（一手ごとにリセットされるため）
+          const aiThinkTime = settings.timeControl * 900;
 
+          const startTime = Date.now();
           const result = await game.findBestMove(aiThinkTime);
+          const elapsed = Math.floor((Date.now() - startTime) / 1000); // 経過時間（秒）
+
           setSearchResult(result);
 
           if (result.move !== 0) {
-            game.applyMove(result.move);
+            const success = game.applyMove(result.move);
             game.lastMovePos = decodeTo(result.move);
+
+            // AIの消費時間を反映
+            if (game.turn === 0) { // 次が先手（つまりAIは後手だった）
+              setGoteTime(prev => Math.max(0, prev - elapsed));
+            } else { // 次が後手（つまりAIは先手だった）
+              setSenteTime(prev => Math.max(0, prev - elapsed));
+            }
 
             // 詰みチェック
             if (game.gameOver) {
               clearTimer();
               setGameResult(game.turn === 0 ? 'gote_win' : 'sente_win');
             } else {
-              // AI着手後もタイマーを再スタート
+              // AI着手後、次の手番の持ち時間をリセット
+              if (game.turn === 0) {
+                setSenteTime(settings.timeControl);
+              } else {
+                setGoteTime(settings.timeControl);
+              }
               startTimer();
             }
 
@@ -159,12 +224,12 @@ export function useGame(initialSettings: GameSettings) {
           }
 
           setIsThinking(false);
-        }, 300);
+        }, 100);
       }
 
       return success;
     },
-    [game, settings, senteTime, goteTime, updateState, clearTimer, startTimer]
+    [game, settings, updateState, clearTimer, startTimer]
   );
 
   const getLegalMoves = useCallback(
@@ -195,5 +260,6 @@ export function useGame(initialSettings: GameSettings) {
     getLegalMoves,
     resetGame,
     resign,
+    undo,
   };
 }
