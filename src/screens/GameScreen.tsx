@@ -5,10 +5,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  SafeAreaView,
   Modal,
   ScrollView,
+  SafeAreaView,
 } from 'react-native';
+// import { SafeAreaView } from 'react-native-safe-area-context';
 import { Board } from '../components/Board';
 import { CapturedPieces } from '../components/CapturedPieces';
 import { PlayLimitModal } from '../components/PlayLimitModal';
@@ -22,8 +23,8 @@ import i18n from '../i18n/translations';
 import { colors } from '../styles/colors';
 import { decodeTo, decodePromote } from '../engine/move';
 import { StorageService } from '../services/StorageService';
-import { AdService } from '../services/AdService';
-import { PurchaseService } from '../services/PurchaseService';
+// import { AdService } from '../services/AdService';
+// import { PurchaseService } from '../services/PurchaseService';
 
 export const GameScreen: React.FC = () => {
   const [isFlipped, setIsFlipped] = useState(false);
@@ -86,6 +87,8 @@ export const GameScreen: React.FC = () => {
     }
 
     // 広告とIAPを初期化（エラーが発生しても続行）
+    // クラッシュ調査のため一時的に無効化
+    /*
     try {
       await AdService.initAds();
     } catch (error) {
@@ -97,6 +100,7 @@ export const GameScreen: React.FC = () => {
     } catch (error) {
       console.error('Failed to initialize IAP:', error);
     }
+    */
   };
 
   // プレミアム状態が変わったら再チェック
@@ -138,12 +142,16 @@ export const GameScreen: React.FC = () => {
       const targetMoves = moves.filter((m) => decodeTo(m) === sq);
 
       if (targetMoves.length > 0) {
-        if (targetMoves.length === 2) {
+        // 成る手と成らない手の両方があるかチェック
+        const promoteMove = targetMoves.find((m) => decodePromote(m));
+        const noPromoteMove = targetMoves.find((m) => !decodePromote(m));
+
+        if (promoteMove && noPromoteMove) {
           // 成るか成らないかの選択が必要
           setPendingPromoteMoves(targetMoves);
           setShowPromoteModal(true);
         } else {
-          // 選択肢がない場合（強制的に成る、または成れない）
+          // 選択肢がない場合（強制的に成る、成れない、または既に成り駒）
           makeMove(targetMoves[0]);
           setSelection(null);
           setLegalMoves([]);
@@ -203,21 +211,9 @@ export const GameScreen: React.FC = () => {
       return;
     }
 
-    // 無料版の場合、広告を表示
-    if (!isPremium) {
-      const adShown = await AdService.showInterstitialAd();
-      if (adShown) {
-        // 広告が表示された場合、少し待ってから対局開始
-        setTimeout(() => {
-          startGameAfterAd();
-        }, 500);
-      } else {
-        // 広告が表示できなかった場合はそのまま開始
-        startGameAfterAd();
-      }
-    } else {
-      startGameAfterAd();
-    }
+    // 広告機能は一時的に無効化（将来的に復活予定）
+    // 直接対局を開始
+    startGameAfterAd();
   };
 
   const startGameAfterAd = async () => {
@@ -701,9 +697,9 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 8,
     width: '100%',
     paddingHorizontal: 4,
+    paddingBottom: 30, // Ensure space from bottom edge
   },
   button: {
     backgroundColor: colors.primary,

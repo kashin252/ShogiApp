@@ -61,7 +61,7 @@ export const PlayLimitModal: React.FC<PlayLimitModalProps> = ({
                     ) : (
                         <>
                             <Text style={styles.message}>
-                                本日の残りプレイ回数: {remainingPlays}/3回
+                                本日の残りプレイ回数: {remainingPlays}/5回
                             </Text>
 
                             <Text style={styles.hint}>

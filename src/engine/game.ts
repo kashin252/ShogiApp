@@ -135,6 +135,22 @@ export class ShogiGame {
   }
 
   async findBestMove(timeLimit: number = 15000): Promise<SearchResult> {
+    // 定跡チェック（序盤のみ）
+    if (this.ply < 20) {
+      const { getJosekiMove } = await import('./josekiService');
+      const josekiMove = getJosekiMove(this);
+      if (josekiMove !== null) {
+        return {
+          move: josekiMove,
+          score: 0,
+          depth: 0,
+          nodes: 1,
+          time: 0,
+          isJoseki: true,
+        };
+      }
+    }
+
     // 初手はランダム
     if (this.moveCount === 0) {
       const moves = new Int32Array(512);

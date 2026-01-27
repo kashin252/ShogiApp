@@ -21,7 +21,7 @@ interface PremiumScreenProps {
 export const PremiumScreen: React.FC<PremiumScreenProps> = ({ onClose }) => {
     const [isPremium, setIsPremium] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [price, setPrice] = useState('¥490');
+    const [price, setPrice] = useState('¥800');
 
     useEffect(() => {
         checkPremiumStatus();
@@ -37,8 +37,10 @@ export const PremiumScreen: React.FC<PremiumScreenProps> = ({ onClose }) => {
         try {
             const products = await PurchaseService.getProducts();
             if (products && products.length > 0) {
-                // 価格情報を取得（実装はライブラリのAPIに依存）
-                // setPrice(products[0].localizedPrice);
+                // ストアから取得した価格情報を反映
+                if (products[0].localizedPrice) {
+                    setPrice(products[0].localizedPrice);
+                }
             }
         } catch (error) {
             console.error('Failed to load products:', error);

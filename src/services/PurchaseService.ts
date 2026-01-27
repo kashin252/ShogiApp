@@ -14,7 +14,7 @@ if (Platform.OS !== 'web') {
 
 // 商品ID（実際の商品IDに置き換える必要があります）
 const PRODUCT_IDS = {
-    PREMIUM: 'com.yourcompany.shogiapp.premium',
+    PREMIUM: 'premium_upgrade',
 };
 
 export class PurchaseService {

@@ -49,17 +49,10 @@ export const InfoModal: React.FC<InfoModalProps> = ({ visible, onClose }) => {
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>{i18n.t('modals.info.history.title')}</Text>
 
-                            <View style={styles.historyItem}>
-                                <Text style={styles.version}>v1.1.0</Text>
-                                <Text style={styles.date}>2025-11-28</Text>
-                                <Text style={styles.historyText}>
-                                    {i18n.t('modals.info.history.v1_1_0')}
-                                </Text>
-                            </View>
 
                             <View style={styles.historyItem}>
                                 <Text style={styles.version}>v1.0.0</Text>
-                                <Text style={styles.date}>2025-11-27</Text>
+                                <Text style={styles.date}>2026-01-25</Text>
                                 <Text style={styles.historyText}>
                                     {i18n.t('modals.info.history.v1_0_0')}
                                 </Text>

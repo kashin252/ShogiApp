@@ -3,7 +3,8 @@ import { SearchResult, PIECE_VALUES } from '../types/game.types';
 import { generateMoves } from './moveGenerator';
 import { makeMove, unmakeMove } from './makeMove';
 import { isInCheck } from './check';
-import { evaluate } from './evaluate';
+// import { evaluate } from './evaluate';  // 元の重い評価関数（コメントアウト）
+import { evaluateFast as evaluate } from './evaluateFast';  // 高速版を使用
 import { TT_MASK, TT_EXACT, TT_LOWER, TT_UPPER } from './constants';
 import { decodeDrop, decodeCaptured, decodeTo, decodeFrom, decodePiece, decodePromote } from './move';
 

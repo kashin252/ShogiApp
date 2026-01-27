@@ -64,7 +64,7 @@ export function useGame(initialSettings: GameSettings) {
         });
       }
     }, 1000);
-  }, [game, gameResult, clearTimer]);
+  }, [game, gameResult, clearTimer, settings.timeControl]);
 
   const resetGame = useCallback((newSettings: GameSettings) => {
     clearTimer();

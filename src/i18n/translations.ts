@@ -3,7 +3,7 @@ import { I18n } from 'i18n-js';
 
 const i18n = new I18n({
     ja: {
-        appTitle: '将棋アプリ',
+        appTitle: 'ASAKURA SHOGI',
         gameMode: {
             pvp: '対人戦',
             ai: 'AI戦',
@@ -93,7 +93,7 @@ const i18n = new I18n({
                 subscribe: '登録する',
                 subscribed: '登録済み',
                 remaining: '残り{{count}}回',
-                note: '※ 購入後、機種変更時も無料で復元できます\n※ 返金は購入後24時間以内に限り可能です',
+                note: '※ 購入後、機種変更時も無料で復元できます\n',
                 done: '閉じる',
                 alerts: {
                     purchaseSuccess: {
@@ -129,7 +129,7 @@ const i18n = new I18n({
                 rule: {
                     title: '独自の将棋ルール',
                     text: '本アプリでは、通常の将棋ルールに加えて以下の独自ルールを採用しています。\n新しい駒の酔象を追加。後ろ以外の周囲７マスに移動できる。\n成ると太子に成ることができる。玉と同じ動きができる。\n酔象は相手に取られると再利用できない。\nそれ以外は本将棋と同じルールにここではしています',
-                    bullet1: '• プレイ回数制限（1日3回まで無料）',
+                    bullet1: '• プレイ回数制限（1日5回まで無料）',
                     bullet2: '• プレミアム会員は無制限プレイ可能',
                     bullet3: '• 敵陣に入った際の「成り」選択機能',
                 },
@@ -142,7 +142,7 @@ const i18n = new I18n({
         },
     },
     en: {
-        appTitle: 'Shogi App',
+        appTitle: 'Asakura Shogi',
         gameMode: {
             pvp: 'PvP',
             ai: 'vs AI',
@@ -232,7 +232,7 @@ const i18n = new I18n({
                 subscribe: 'Subscribe',
                 subscribed: 'Subscribed',
                 remaining: '{{count}} plays left',
-                note: '* You can restore your purchase for free when changing devices.\n* Refunds are available within 24 hours of purchase.',
+                note: '* You can restore your purchase for free when changing devices.\n',
                 done: 'Close',
                 alerts: {
                     purchaseSuccess: {
@@ -268,7 +268,7 @@ const i18n = new I18n({
                 rule: {
                     title: 'Unique Shogi Rules',
                     text: 'This app adopts the following unique rules in addition to standard Shogi rules.\nAdded a new piece "Drunken Elephant" (Suizo). It can move to any of the 7 surrounding squares except directly backward.\nIt can promote to "Crown Prince" (Taishi), which moves like a King.\nOnce captured, the Drunken Elephant cannot be dropped back onto the board.\nOther rules are the same as standard Shogi.',
-                    bullet1: '• Play Limit (3 free plays per day)',
+                    bullet1: '• Play Limit (5 free plays per day)',
                     bullet2: '• Unlimited play for Premium members',
                     bullet3: '• "Promote" selection when entering enemy camp',
                 },

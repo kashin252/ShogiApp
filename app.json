@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "ShogiApp",
-    "slug": "ShogiApp",
+    "name": "Asakura Shogi",
+    "slug": "asakura-shogi",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -29,10 +29,10 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
+      "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
-      "package": "com.yourcompany.shogiapp",
-      "versionCode": 1,
+      "package": "com.kashin252.shogiapp",
+      "versionCode": 13,
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE"
@@ -40,6 +40,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "fb4e104d-975a-4959-a1f1-9bba98ffcc5f"
+      }
     }
   }
 }

@@ -13,8 +13,8 @@ interface BoardProps {
 }
 
 const { width, height } = Dimensions.get('window');
-const BOARD_PADDING = 4;
-const OTHER_UI_HEIGHT = 380; // Approx height for header, captured pieces, buttons, margins
+const BOARD_PADDING = 12;
+const OTHER_UI_HEIGHT = 350; // Restored to reasonable size now that SafeAreaView works correctly
 
 // Ensure the board fits within the screen width AND height
 const MAX_BOARD_WIDTH = Math.min(width - BOARD_PADDING * 2, 400);

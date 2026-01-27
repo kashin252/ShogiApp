@@ -8,7 +8,7 @@ const KEYS = {
     PURCHASE_DATE: '@shogi_purchase_date',
 };
 
-const MAX_FREE_PLAYS = 3;
+const MAX_FREE_PLAYS = 5;
 
 export class StorageService {
     /**

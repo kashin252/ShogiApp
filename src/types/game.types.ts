@@ -40,6 +40,7 @@ export interface SearchResult {
   depth: number;
   nodes: number;
   time: number;
+  isJoseki?: boolean;
 }
 
 export type GameMode = 'pvp' | 'ai';
