@@ -155,8 +155,31 @@ export class StorageService {
             return;
         }
 
-        console.log('Initializing for dev: Clearing all data');
-        await this.clearAll();
+        console.log('Initializing for dev: Checking play count and premium status');
+        // await this.clearAll(); // コメントアウト：リロードのたびに制限がリセットされないようにする
         this.isDevInitialized = true;
+    }
+
+    /**
+     * お知らせモーダルが表示されたバージョンを取得
+     */
+    static async getLastInfoModalVersion(): Promise<string | null> {
+        try {
+            return await AsyncStorage.getItem('@shogi_last_info_modal_version');
+        } catch (error) {
+            console.error('Failed to get last info modal version:', error);
+            return null;
+        }
+    }
+
+    /**
+     * お知らせモーダルの表示バージョンを保存
+     */
+    static async setLastInfoModalVersion(version: string): Promise<void> {
+        try {
+            await AsyncStorage.setItem('@shogi_last_info_modal_version', version);
+        } catch (error) {
+            console.error('Failed to set last info modal version:', error);
+        }
     }
 }

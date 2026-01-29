@@ -13,16 +13,19 @@ interface BoardProps {
 }
 
 const { width, height } = Dimensions.get('window');
-const BOARD_PADDING = 12;
-const OTHER_UI_HEIGHT = 350; // Restored to reasonable size now that SafeAreaView works correctly
+const BOARD_PADDING = 4;
+// Adjust other UI height based on screen size
+const OTHER_UI_HEIGHT = height > 800 ? 320 : 280;
 
 // Ensure the board fits within the screen width AND height
-const MAX_BOARD_WIDTH = Math.min(width - BOARD_PADDING * 2, 400);
+// Removing the 400 cap to use more space on larger phones
+const MAX_BOARD_WIDTH = width - BOARD_PADDING * 2;
 const MAX_BOARD_HEIGHT = height - OTHER_UI_HEIGHT;
 
 // Calculate square size based on the most constraining dimension
 const SQUARE_SIZE_W = Math.floor(MAX_BOARD_WIDTH / 9);
 const SQUARE_SIZE_H = Math.floor(MAX_BOARD_HEIGHT / 9);
+const IS_VERTICAL_CONSTRAINED = SQUARE_SIZE_H < SQUARE_SIZE_W;
 const SQUARE_SIZE = Math.min(SQUARE_SIZE_W, SQUARE_SIZE_H);
 
 const BOARD_SIZE = SQUARE_SIZE * 9;
@@ -135,7 +138,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 0, 0.3)', // Highlight with transparency
   },
   lastMove: {
-    backgroundColor: 'rgba(255, 165, 0, 0.3)', // Highlight with transparency
+    backgroundColor: 'rgba(255, 255, 0, 0.4)', // Slightly stronger yellow-orange
+    borderWidth: 2,
+    borderColor: '#ff0', // Bright yellow border
   },
   legalDot: {
     position: 'absolute',
@@ -168,7 +173,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: Platform.OS === 'ios' ? 'Hiragino Mincho ProN' : 'serif',
     includeFontPadding: false,
-    lineHeight: SQUARE_SIZE * 0.7,
+    lineHeight: Platform.OS === 'ios' ? SQUARE_SIZE * 0.8 : SQUARE_SIZE * 0.95,
   },
   pieceRotatedContainer: {
     transform: [{ rotate: '180deg' }],

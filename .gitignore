@@ -37,5 +37,15 @@ yarn-error.*
 *.tsbuildinfo
 
 # generated native folders
-/ios
-/android
+# /ios
+# /android
+_test_build/
+
+# secrets & artifacts
+*.aab
+build-*.aab
+credentials.json
+.vscode/
+*.pepk
+*.keystore
+key.jks

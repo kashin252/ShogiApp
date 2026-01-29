@@ -1,0 +1,14 @@
+{
+    "name": "shogi-engine",
+    "version": "1.0.0",
+    "main": "src/index.ts",
+    "types": "src/index.d.ts",
+    "platforms": [
+        "android"
+    ],
+    "expo": {
+        "android": {
+            "buildType": "ExpoModulesPythonPackage"
+        }
+    }
+}

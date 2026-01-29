@@ -1,0 +1,36 @@
+# ビルドに不要なファイル
+
+# C++モジュール（現在無効化）
+modules/
+
+# ドキュメント
+docs/
+README.md
+
+# 開発用ファイル
+scripts/
+test_engine.ts
+*.log
+
+# リリースファイル
+release/
+
+# システムファイル
+.DS_Store
+*.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# テスト
+__tests__/
+*.test.ts
+*.spec.ts
+coverage/

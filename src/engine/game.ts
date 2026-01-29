@@ -6,9 +6,21 @@ import { generateMoves } from './moveGenerator';
 import { isInCheck } from './check';
 import { makeMove, unmakeMove } from './makeMove';
 import { iterativeDeepening } from './search';
-import { decodeTo, decodeFrom, decodeDrop, decodePiece } from './move';
+import { decodeTo, decodeFrom, decodeDrop, decodePiece, encodeMove } from './move';
 
-export class ShogiGame {
+// ネイティブエンジンは現在無効化（Expo prebuild後に有効化）
+const nativeEngine: any = null;
+// TODO: C++版を有効化する際は以下のコメントを外す
+// import { Platform } from 'react-native';
+// if (Platform.OS !== 'web') {
+//   try {
+//     nativeEngine = require('../../modules/shogi-engine/src/index');
+//   } catch (e) {
+//     console.log('Native shogi engine not available');
+//   }
+// }
+
+export class ShogiGame implements GameState {
   public board: Int8Array;
   public hand: [Int8Array, Int8Array];
   public turn: Side;
@@ -18,6 +30,9 @@ export class ShogiGame {
   public lastMovePos: number;
   public currentHash: number;
   public resignCount: number;
+  public materialScore: number;
+  public pstScore: number;
+  public kingSq: Int32Array; // [SenteKingSq, GoteKingSq]
 
   // 置換表
   public ttHash: Float64Array;
@@ -44,6 +59,7 @@ export class ShogiGame {
     // 盤面
     this.board = setupInitialBoard();
     this.hand = [new Int8Array(17), new Int8Array(17)];
+    this.kingSq = new Int32Array(2);
     this.turn = 0;
     this.ply = 0;
     this.moveCount = 0;
@@ -53,6 +69,11 @@ export class ShogiGame {
 
     // ハッシュ
     this.currentHash = computeHash(this.board, this.hand, this.turn);
+
+    // 点数初期化（初回のみ全計算）
+    this.materialScore = 0;
+    this.pstScore = 0;
+    this.initScores();
 
     // 置換表
     const TT_SIZE = 1 << 20;
@@ -85,6 +106,7 @@ export class ShogiGame {
     this.historyIdx = 0;
 
     this.currentHash = computeHash(this.board, this.hand, this.turn);
+    this.initScores();
 
     // テーブルクリア
     this.ttHash.fill(0);
@@ -94,15 +116,7 @@ export class ShogiGame {
   }
 
   getState(): GameState {
-    return {
-      board: copyBoard(this.board),
-      hand: copyHand(this.hand),
-      turn: this.turn,
-      ply: this.ply,
-      moveCount: this.moveCount,
-      gameOver: this.gameOver,
-      lastMovePos: this.lastMovePos,
-    };
+    return this;
   }
 
   applyMove(encodedMove: number): boolean {
@@ -132,6 +146,36 @@ export class ShogiGame {
     }
 
     return true;
+  }
+
+  private initScores(): void {
+    const { getPstBonus } = require('./pst');
+    const { PIECE_VALUES, OU } = require('../types/game.types');
+
+    this.materialScore = 0;
+    this.pstScore = 0;
+    this.kingSq.fill(-1);
+
+    for (let sq = 0; sq < 81; sq++) {
+      const v = this.board[sq];
+      if (v === 0) continue;
+      const side = v > 0 ? 0 : 1;
+      const pt = Math.abs(v);
+      const sign = v > 0 ? 1 : -1;
+
+      if (pt === OU) {
+        this.kingSq[side] = sq;
+      }
+
+      this.materialScore += sign * PIECE_VALUES[pt];
+      this.pstScore += sign * getPstBonus(pt, sq, side);
+    }
+
+    const handBonus = 1.12;
+    for (let p = 1; p <= 16; p++) {
+      this.materialScore += this.hand[0][p] * PIECE_VALUES[p] * handBonus;
+      this.materialScore -= this.hand[1][p] * PIECE_VALUES[p] * handBonus;
+    }
   }
 
   async findBestMove(timeLimit: number = 15000): Promise<SearchResult> {
@@ -175,6 +219,47 @@ export class ShogiGame {
       };
     }
 
+    // ネイティブC++エンジンを試す（モバイルのみ）
+    if (nativeEngine && nativeEngine.isNativeEngineAvailable()) {
+      try {
+        // 盤面データを準備
+        const boardArray = Array.from(this.board);
+        const senteHandArray = Array.from(this.hand[0]);
+        const goteHandArray = Array.from(this.hand[1]);
+
+        const result = await nativeEngine.findBestMoveNative(
+          boardArray,
+          senteHandArray,
+          goteHandArray,
+          this.turn,
+          timeLimit
+        );
+
+        if (result) {
+          // C++からの結果をTypeScript形式に変換
+          const move = encodeMove(
+            result.drop ? 81 : result.from,
+            result.to,
+            result.promote,
+            result.drop,
+            result.piece,
+            result.captured
+          );
+
+          return {
+            move: move,
+            score: result.score,
+            depth: result.depth,
+            nodes: result.nodes,
+            time: result.timeMs,
+          };
+        }
+      } catch (e) {
+        console.warn('Native engine failed, falling back to TypeScript:', e);
+      }
+    }
+
+    // TypeScript版（フォールバック / Web）
     return iterativeDeepening(this, timeLimit);
   }
 

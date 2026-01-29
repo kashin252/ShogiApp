@@ -7,6 +7,7 @@ import {
     Modal,
 } from 'react-native';
 import { colors } from '../styles/colors';
+import i18n from '../i18n/translations';
 
 interface PlayLimitModalProps {
     visible: boolean;
@@ -39,15 +40,14 @@ export const PlayLimitModal: React.FC<PlayLimitModalProps> = ({
                     {isLimitReached ? (
                         <>
                             <Text style={styles.message}>
-                                本日の無料プレイ回数（3回）に達しました。{'\n'}
+                                本日の無料プレイ回数（5回）に達しました。{'\n'}
                                 プレミアム版にアップグレードすると、無制限でプレイできます。
                             </Text>
 
                             <View style={styles.features}>
                                 <Text style={styles.featureTitle}>プレミアム版の特典:</Text>
-                                <Text style={styles.feature}>✓ 無制限プレイ</Text>
-                                <Text style={styles.feature}>✓ 広告なし</Text>
-                                <Text style={styles.feature}>✓ 買い切り（追加料金なし）</Text>
+                                <Text style={styles.feature}>✓ {i18n.t('modals.premium.features.unlimitedAndTime')}</Text>
+                                <Text style={styles.feature}>✓ {i18n.t('modals.premium.features.oneTime')}</Text>
                             </View>
 
                             <TouchableOpacity style={styles.upgradeButton} onPress={onUpgrade}>

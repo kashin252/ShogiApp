@@ -79,10 +79,11 @@ const i18n = new I18n({
                 benefit2: '・広告非表示',
                 benefit3: '・「待った」機能使い放題',
                 features: {
+                    unlimitedAndTime: '回数無制限、時間設定30秒、60秒追加等',
+                    oneTime: '買い切り（追加料金なし）',
                     unlimited: '無制限プレイ',
                     noAds: '広告なし',
                     allFeatures: 'すべての機能が利用可能',
-                    oneTime: '買い切り（追加料金なし）',
                 },
                 price: {
                     label: '特別価格',
@@ -128,9 +129,9 @@ const i18n = new I18n({
                 title: 'お知らせ',
                 rule: {
                     title: '独自の将棋ルール',
-                    text: '本アプリでは、通常の将棋ルールに加えて以下の独自ルールを採用しています。\n新しい駒の酔象を追加。後ろ以外の周囲７マスに移動できる。\n成ると太子に成ることができる。玉と同じ動きができる。\n酔象は相手に取られると再利用できない。\nそれ以外は本将棋と同じルールにここではしています',
-                    bullet1: '• プレイ回数制限（1日5回まで無料）',
-                    bullet2: '• プレミアム会員は無制限プレイ可能',
+                    text: '本アプリでは、通常の将棋ルールに加えて以下の独自ルールを採用しています。\n新しい駒の酔象を追加。後ろ以外の周囲７マスに移動できる。\n成ると太子に成ることができる。玉と同じ動きができる。\n酔象は相手に取られると再利用できない。\nそれ以外は本将棋と同じルールにしています。',
+                    bullet1: '• 無料版:プレイ回数制限（1日5回まで無料）,一手10秒のみ',
+                    bullet2: '• 有料版:無制限プレイ、フィッシャルール選択可能',
                     bullet3: '• 敵陣に入った際の「成り」選択機能',
                 },
                 history: {
@@ -218,10 +219,11 @@ const i18n = new I18n({
                 benefit2: '・No Ads',
                 benefit3: '・Unlimited Undo',
                 features: {
+                    unlimitedAndTime: 'Unlimited plays, 30s/60s time options, etc.',
+                    oneTime: 'One-time Purchase',
                     unlimited: 'Unlimited Plays',
                     noAds: 'No Ads',
                     allFeatures: 'All Features Unlocked',
-                    oneTime: 'One-time Purchase',
                 },
                 price: {
                     label: 'Special Price',
@@ -268,8 +270,8 @@ const i18n = new I18n({
                 rule: {
                     title: 'Unique Shogi Rules',
                     text: 'This app adopts the following unique rules in addition to standard Shogi rules.\nAdded a new piece "Drunken Elephant" (Suizo). It can move to any of the 7 surrounding squares except directly backward.\nIt can promote to "Crown Prince" (Taishi), which moves like a King.\nOnce captured, the Drunken Elephant cannot be dropped back onto the board.\nOther rules are the same as standard Shogi.',
-                    bullet1: '• Play Limit (5 free plays per day)',
-                    bullet2: '• Unlimited play for Premium members',
+                    bullet1: '• Free version: Play limit (5 free plays per day), 10 seconds per move only',
+                    bullet2: '• Premium version: Unlimited plays, Fischer rule available',
                     bullet3: '• "Promote" selection when entering enemy camp',
                 },
                 history: {

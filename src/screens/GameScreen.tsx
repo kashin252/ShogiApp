@@ -34,12 +34,13 @@ export const GameScreen: React.FC = () => {
   const [showPremiumScreen, setShowPremiumScreen] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
-  const [remainingPlays, setRemainingPlays] = useState(3);
+  const [remainingPlays, setRemainingPlays] = useState(5);
 
   // 新規対局の設定
   const [newGameSettings, setNewGameSettings] = useState<GameSettings>({
     mode: 'pvp',
-    timeControl: 30,
+    timeControl: 10,
+    fischerRule: false,
   });
 
   const {
@@ -73,7 +74,7 @@ export const GameScreen: React.FC = () => {
   const initializeServices = async () => {
     try {
       // 開発環境の場合はデータをリセット
-      await StorageService.initForDev();
+      // await StorageService.initForDev(); // リリースビルドでは無効化
 
       // プレミアム状態をチェック
       const premium = await StorageService.isPremium();
@@ -82,8 +83,22 @@ export const GameScreen: React.FC = () => {
       // 残りプレイ回数を取得
       const remaining = await StorageService.getRemainingPlays();
       setRemainingPlays(remaining);
+
+      // お知らせモーダルの自動表示チェック
+      const currentVersion = '1.0.0'; // アプリバージョン
+      const lastShownVersion = await StorageService.getLastInfoModalVersion();
+
+      if (lastShownVersion !== currentVersion) {
+        // 初回起動 or バージョンアップ時に自動表示
+        setTimeout(() => {
+          setShowInfoModal(true);
+        }, 500); // 500ms遅延して表示
+      }
     } catch (error) {
       console.error('Failed to initialize storage:', error);
+      // デフォルト値を設定
+      setIsPremium(false);
+      setRemainingPlays(5);
     }
 
     // 広告とIAPを初期化（エラーが発生しても続行）
@@ -213,12 +228,12 @@ export const GameScreen: React.FC = () => {
 
     // 広告機能は一時的に無効化（将来的に復活予定）
     // 直接対局を開始
-    startGameAfterAd();
+    startGameAfterAd(newGameSettings);
   };
 
-  const startGameAfterAd = async () => {
+  const startGameAfterAd = async (gameSettings: GameSettings) => {
     setShowNewGameModal(false);
-    resetGame(newGameSettings);
+    resetGame(gameSettings);
 
     // プレイ回数をインクリメント
     await StorageService.incrementPlayCount();
@@ -317,7 +332,9 @@ export const GameScreen: React.FC = () => {
           {settings.mode === 'ai' && searchResult && (
             <View style={styles.searchInfo}>
               <Text style={styles.searchInfoText}>
-                {i18n.t('search.depth')}: {searchResult.depth} | {i18n.t('search.score')}: {searchResult.score > 0 ? '+' : ''}{searchResult.score}
+                {i18n.t('search.depth')}: {searchResult.depth} | {i18n.t('search.score')}: {
+                  (settings.aiSide === 1 ? -searchResult.score : searchResult.score) > 0 ? '+' : ''
+                }{settings.aiSide === 1 ? -searchResult.score : searchResult.score}
               </Text>
               <Text style={styles.searchInfoText}>
                 {i18n.t('search.nodes')}: {searchResult.nodes.toLocaleString()} | {i18n.t('search.time')}: {searchResult.time}ms
@@ -413,7 +430,9 @@ export const GameScreen: React.FC = () => {
             onPress={handleUndo}
             disabled={isThinking || gameState.moveCount === 0}
           >
-            <Text style={styles.buttonText}>{i18n.t('buttons.undo')}</Text>
+            <Text style={styles.buttonText}>
+              {!isPremium && '🔒 '}{i18n.t('buttons.undo')}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -445,7 +464,7 @@ export const GameScreen: React.FC = () => {
                       setNewGameSettings({ ...newGameSettings, mode: 'pvp', aiSide: undefined });
                     } else {
                       // AI戦に切り替える際、持ち時間が無制限(0)なら30秒に変更
-                      const newTime = newGameSettings.timeControl === 0 ? 30 : newGameSettings.timeControl;
+                      const newTime = newGameSettings.timeControl === 0 ? 60 : newGameSettings.timeControl;
                       setNewGameSettings({
                         ...newGameSettings,
                         mode: 'ai',
@@ -474,13 +493,28 @@ export const GameScreen: React.FC = () => {
                   label={i18n.t('modals.newGame.timeControl')}
                   value={newGameSettings.timeControl}
                   options={[
-                    ...(newGameSettings.mode === 'pvp' ? [{ label: i18n.t('time.unlimited'), value: 0 }] : []),
+                    ...(newGameSettings.mode === 'pvp' && isPremium ? [{ label: i18n.t('time.unlimited'), value: 0 }] : []),
                     { label: `10${i18n.t('time.seconds')}`, value: 10 },
-                    { label: `30${i18n.t('time.seconds')}`, value: 30 },
-                    { label: `60${i18n.t('time.seconds')}`, value: 60 },
-                  ]}
-                  onSelect={(value) => setNewGameSettings({ ...newGameSettings, timeControl: value })}
+                    ...(isPremium ? [
+                      { label: `30${i18n.t('time.seconds')}`, value: 30 },
+                      { label: `60${i18n.t('time.seconds')}`, value: 60 },
+                    ] : []),
+                  ] /* options */}
+                  onSelect={(value) => setNewGameSettings({ ...newGameSettings, timeControl: value, fischerRule: false })}
                 />
+
+                {/* フィッシャールール (プレミアム・対人戦のみ) */}
+                {isPremium && newGameSettings.mode === 'pvp' && (
+                  <TouchableOpacity
+                    style={[styles.checkboxRow, newGameSettings.fischerRule && styles.checkboxRowSelected]}
+                    onPress={() => setNewGameSettings({ ...newGameSettings, fischerRule: !newGameSettings.fischerRule, timeControl: newGameSettings.fischerRule ? 10 : 60 })}
+                  >
+                    <View style={[styles.checkbox, newGameSettings.fischerRule && styles.checkboxChecked]}>
+                      {newGameSettings.fischerRule && <Text style={styles.checkboxMark}>✓</Text>}
+                    </View>
+                    <Text style={styles.checkboxLabel}>フィッシャールール (1分+5秒/手)</Text>
+                  </TouchableOpacity>
+                )}
 
                 {/* 開始・キャンセルボタン */}
                 <TouchableOpacity style={styles.modalButton} onPress={startNewGame}>
@@ -531,7 +565,11 @@ export const GameScreen: React.FC = () => {
         {/* Play Limit Modal */}
         <InfoModal
           visible={showInfoModal}
-          onClose={() => setShowInfoModal(false)}
+          onClose={async () => {
+            setShowInfoModal(false);
+            // バージョンを保存して次回表示しないようにする
+            await StorageService.setLastInfoModalVersion('1.0.0');
+          }}
         />
 
         <PlayLimitModal
@@ -575,9 +613,9 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    padding: 4,
+    padding: 2,
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start', // Change to flex-start to avoid too much spacing
   },
   header: {
     flexDirection: 'row',
@@ -864,5 +902,47 @@ const styles = StyleSheet.create({
     color: '#333',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    marginTop: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  checkboxRowSelected: {
+    backgroundColor: '#fff',
+    borderColor: colors.primary,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#999',
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  checkboxChecked: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  checkboxMark: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    flex: 1,
+    flexWrap: 'wrap',
   },
 });

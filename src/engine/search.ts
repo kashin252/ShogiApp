@@ -1,10 +1,10 @@
-import { ShogiGame } from './game';
+import type { GameState } from '../types/game.types';
 import { SearchResult, PIECE_VALUES } from '../types/game.types';
 import { generateMoves } from './moveGenerator';
 import { makeMove, unmakeMove } from './makeMove';
 import { isInCheck } from './check';
-// import { evaluate } from './evaluate';  // 元の重い評価関数（コメントアウト）
-import { evaluateFast as evaluate } from './evaluateFast';  // 高速版を使用
+// import { evaluateFast as evaluate } from './evaluateFast';  // 高速版を使用（無効化）
+import { evaluate } from './evaluate';  // 通常版を使用
 import { TT_MASK, TT_EXACT, TT_LOWER, TT_UPPER } from './constants';
 import { decodeDrop, decodeCaptured, decodeTo, decodeFrom, decodePiece, decodePromote } from './move';
 
@@ -87,6 +87,7 @@ function getHistoryScore(from: number, to: number): number {
 // 指し手のスコアリング（並び替え用）- 強化版
 // ========================================
 function getMoveScore(
+  game: GameState,
   move: number,
   ttMove: number,
   ply: number
@@ -131,10 +132,13 @@ function getMoveScore(
 // ========================================
 // ソート（選択ソート - 上位のみ効率的にソート）
 // ========================================
-function sortMovesByScore(
+function scoreMoves(
+  game: GameState,
   moves: Int32Array,
   scores: Int32Array,
-  count: number
+  count: number,
+  ttBestMove: number,
+  ply: number
 ): void {
   // 選択ソート（全体をソートするより、上位を早く見つけるのに効率的）
   for (let i = 0; i < count - 1; i++) {
@@ -161,16 +165,15 @@ function sortMovesByScore(
 // 静止探索（Quiescence Search）
 // ========================================
 function quiesce(
-  game: ShogiGame,
+  game: GameState,
+  ply: number,
   alpha: number,
-  beta: number,
-  depth: number,
-  qDepth: number
+  beta: number
 ): number {
   nodes++;
 
   // 時間チェック
-  if ((nodes & 4095) === 0) {
+  if ((nodes & 1023) === 0) {
     if (Date.now() - startTime > timeLimit) {
       stopped = true;
       return 0;
@@ -180,13 +183,22 @@ function quiesce(
   // 現在の評価値
   const standPat = evaluate(game);
   if (standPat >= beta) return beta;
+
+  // Delta Pruning
+  // 飛車の価値(1500想定) + マージン = 2000
+  // 現在の評価値に特大のボーナスを足してもalphaに届かないなら、探索する価値なし
+  const DELTA_MARGIN = 2000;
+  if (standPat < alpha - DELTA_MARGIN) {
+    return alpha;
+  }
+
   if (alpha < standPat) alpha = standPat;
 
   // 深さ制限
-  if (qDepth >= 4) return standPat;
+  if (ply >= 4) return standPat;
 
-  const moves = quiesceMoves[qDepth];
-  const scores = quiesceScores[qDepth];
+  const moves = quiesceMoves[ply];
+  const scores = quiesceScores[ply];
   const cnt = generateMoves(game, moves);
 
   // 駒を取る手だけ抽出
@@ -203,7 +215,7 @@ function quiesce(
   }
 
   // ソート
-  sortMovesByScore(moves, scores, captureCount);
+  scoreMoves(game, moves, scores, captureCount, 0, ply); // ttBestMoveは静止探索では使わない
 
   for (let i = 0; i < captureCount; i++) {
     const m = moves[i];
@@ -215,7 +227,7 @@ function quiesce(
       continue;
     }
 
-    const score = -quiesce(game, -beta, -alpha, depth - 1, qDepth + 1);
+    const score = -quiesce(game, ply + 1, -beta, -alpha);
     unmakeMove(game, m);
 
     if (stopped) return 0;
@@ -228,10 +240,10 @@ function quiesce(
 }
 
 // ========================================
-// アルファベータ探索（PVS + LMR + Null Move）
+// アルファベータ探索（PVS + LMR + Null Move + Pruning）
 // ========================================
 function alphaBeta(
-  game: ShogiGame,
+  game: GameState,
   depth: number,
   alpha: number,
   beta: number,
@@ -241,7 +253,7 @@ function alphaBeta(
   nodes++;
 
   // 時間チェック
-  if ((nodes & 4095) === 0) {
+  if ((nodes & 1023) === 0) {
     if (Date.now() - startTime > timeLimit) {
       stopped = true;
       return 0;
@@ -272,10 +284,28 @@ function alphaBeta(
 
   // 深さ0なら静止探索へ
   if (depth <= 0) {
-    return quiesce(game, alpha, beta, 0, 0);
+    return quiesce(game, 0, alpha, beta);
   }
 
   const inCheck = isInCheck(game, game.turn);
+
+  // ========================================
+  // Futility Pruning (不必要枝刈り)
+  // ========================================
+  if (!inCheck && depth <= 3 && Math.abs(alpha) < 9000 && Math.abs(beta) < 9000) {
+    const staticEval = evaluate(game);
+    // 深さに応じたマージン (depth 1: 300, depth 2: 500, depth 3: 900)
+    const margin = [0, 300, 500, 900][depth];
+
+    // 静的評価値があまりに低ければ、これ以上探索してもbetaには届かないと判断してカット（ただしMoveOrdering上などの理由でalpha更新の可能性はあるため、あくまでalphaの更新見込みがない場合）
+    // ここではalphacutではなくbetacutの前段として使うのが一般的だが
+    // 「これ以上やってもalphaを超えない」ならreturn alpha
+    if (staticEval + margin < alpha) {
+      // ttBestMoveがない（有力手がない）場合のみ適用するなど安全策も考えられるが、
+      // 高速化優先で適用する。
+      return alpha;
+    }
+  }
 
   // ========================================
   // Null Move Pruning
@@ -307,10 +337,10 @@ function alphaBeta(
   const cnt = generateMoves(game, moves);
 
   for (let i = 0; i < cnt; i++) {
-    scores[i] = getMoveScore(moves[i], ttBestMove, ply);
+    scores[i] = getMoveScore(game, moves[i], ttBestMove, ply);
   }
 
-  sortMovesByScore(moves, scores, cnt);
+  scoreMoves(game, moves, scores, cnt, ttBestMove, ply);
 
   // ========================================
   // 各手を試す（PVS）
@@ -321,6 +351,19 @@ function alphaBeta(
 
   for (let i = 0; i < cnt; i++) {
     const m = moves[i];
+
+    // ========================================
+    // Late Move Pruning (LMP)
+    // ========================================
+    // 上位N個の手の中に正解手が含まれる確率が高いという前提
+    if (!inCheck && depth <= 3 && legalMoves > (8 + depth * 3)) {
+      // ただし、駒を取る手や成る手、Killer/TT手は除外してはいけない（sortされているので、スコアで判定可能）
+      // スコアが低い = 静かな手であればスキップ
+      // getMoveScoreでおよそ10000以下なら静かな手（Killer=80万, 成る=50万, 取る=100万）
+      if (scores[i] < 500000) {
+        continue; // Prune
+      }
+    }
 
     makeMove(game, m);
 
@@ -411,10 +454,10 @@ function alphaBeta(
 // ========================================
 // 反復深化（メインエントリポイント）
 // ========================================
-export function iterativeDeepening(game: ShogiGame, maxTime: number): SearchResult {
+export function iterativeDeepening(game: GameState, timeMs: number): SearchResult {
   nodes = 0;
   startTime = Date.now();
-  timeLimit = maxTime;
+  timeLimit = timeMs;
   stopped = false;
 
   // テーブルをクリア
@@ -485,7 +528,7 @@ export function iterativeDeepening(game: ShogiGame, maxTime: number): SearchResu
 
     // 時間の半分を使ったら終了
     const elapsed = Date.now() - startTime;
-    if (elapsed > maxTime * 0.5) break;
+    if (elapsed > timeMs * 0.5) break;
   }
 
   const elapsed = Date.now() - startTime;

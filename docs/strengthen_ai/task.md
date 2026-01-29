@@ -1,0 +1,6 @@
+- [x] Analyze current time allocation logic in `useGame.ts`
+- [x] Check engine implementation (TypeScript vs C++)
+- [x] Investigate `src/engine/game.ts` and `src/engine/search.ts`
+- [x] Adjust AI thinking time to be more appropriate for per-move limits
+- [x] Switch to full `evaluate.ts` in `search.ts`
+- [x] Verify AI strength improvements

@@ -58,6 +58,12 @@ export const PremiumScreen: React.FC<PremiumScreenProps> = ({ onClose }) => {
                     i18n.t('modals.premium.alerts.purchaseSuccess.message'),
                     [{ text: 'OK', onPress: onClose }]
                 );
+            } else {
+                // 購入フローが失敗（キャンセル以外）
+                Alert.alert(
+                    i18n.t('modals.premium.alerts.purchaseError.title'),
+                    i18n.t('modals.premium.alerts.purchaseError.message')
+                );
             }
         } catch (error) {
             Alert.alert(
@@ -102,7 +108,10 @@ export const PremiumScreen: React.FC<PremiumScreenProps> = ({ onClose }) => {
             <SafeAreaView style={styles.safeArea}>
                 <View style={styles.container}>
                     <View style={styles.header}>
-                        <Text style={styles.title}>{i18n.t('modals.premium.subscribedTitle')}</Text>
+                        <View>
+                            <Text style={styles.title}>{i18n.t('modals.premium.subscribedTitle')}</Text>
+                            <Text style={styles.versionText}>Build: 40</Text>
+                        </View>
                         <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                             <Text style={styles.closeButtonText}>✕</Text>
                         </TouchableOpacity>
@@ -142,7 +151,10 @@ export const PremiumScreen: React.FC<PremiumScreenProps> = ({ onClose }) => {
         <SafeAreaView style={styles.safeArea}>
             <ScrollView style={styles.container}>
                 <View style={styles.header}>
-                    <Text style={styles.title}>{i18n.t('modals.premium.title')}</Text>
+                    <View>
+                        <Text style={styles.title}>{i18n.t('modals.premium.title')}</Text>
+                        <Text style={styles.versionText}>Build: 40</Text>
+                    </View>
                     <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                         <Text style={styles.closeButtonText}>✕</Text>
                     </TouchableOpacity>
@@ -190,38 +202,10 @@ export const PremiumScreen: React.FC<PremiumScreenProps> = ({ onClose }) => {
                         </>
                     )}
 
+
                     <Text style={styles.note}>
                         {i18n.t('modals.premium.note')}
                     </Text>
-
-                    {/* Debug Button */}
-                    {__DEV__ && (
-                        <View style={{ marginTop: 20, gap: 10 }}>
-                            <TouchableOpacity
-                                style={[styles.purchaseButton, { backgroundColor: '#333', marginBottom: 0 }]}
-                                onPress={async () => {
-                                    const success = await PurchaseService.debugPurchase();
-                                    if (success) {
-                                        setIsPremium(true);
-                                        Alert.alert('Debug', 'Premium activated');
-                                    }
-                                }}
-                            >
-                                <Text style={styles.purchaseButtonText}>[Debug] Force Purchase</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.purchaseButton, { backgroundColor: '#d9534f', marginBottom: 0 }]}
-                                onPress={async () => {
-                                    await StorageService.clearAll();
-                                    setIsPremium(false);
-                                    Alert.alert('Debug', 'All data cleared. Please restart app or reopen this screen.');
-                                }}
-                            >
-                                <Text style={styles.purchaseButtonText}>[Debug] Reset All Data</Text>
-                            </TouchableOpacity>
-                        </View>
-                    )}
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -254,6 +238,10 @@ const styles = StyleSheet.create({
     },
     closeButtonText: {
         fontSize: 24,
+        color: '#999',
+    },
+    versionText: {
+        fontSize: 10,
         color: '#999',
     },
     content: {

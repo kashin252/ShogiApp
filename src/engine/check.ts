@@ -1,11 +1,11 @@
-import { ShogiGame } from './game';
+import type { GameState } from '../types/game.types';
 import { FU, KYO, KEI, GIN, KIN, TO, NKYO, NKEI, NGIN, KAKU, HI, OU, UMA, RYU, ZOU, TAISHI } from '../types/game.types';
 import {
   ATTACK_KEI_S, ATTACK_KEI_G, ATTACK_GIN_S, ATTACK_GIN_G,
   ATTACK_KIN_S, ATTACK_KIN_G, ATTACK_OU, ATTACK_ZOU_S, ATTACK_ZOU_G
 } from './attackTables';
 
-export function isAttacked(game: ShogiGame, sq: number, bySide: number): boolean {
+export function isSquareAttacked(game: GameState, sq: number, bySide: number): boolean {
   const sign = bySide === 0 ? 1 : -1;
 
   // 歩
@@ -117,11 +117,11 @@ export function isAttacked(game: ShogiGame, sq: number, bySide: number): boolean
   return false;
 }
 
-export function isInCheck(game: ShogiGame, side: number): boolean {
+export function isInCheck(game: GameState, side: number): boolean {
   const sign = side === 0 ? 1 : -1;
   for (let sq = 0; sq < 81; sq++) {
     if (game.board[sq] === sign * OU) {
-      return isAttacked(game, sq, 1 - side);
+      return isSquareAttacked(game, sq, 1 - side);
     }
   }
   return true;

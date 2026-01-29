@@ -15,6 +15,28 @@ export interface GameState {
   moveCount: number;
   gameOver: boolean;
   lastMovePos: number;
+  resignCount: number;
+  currentHash: number;
+  materialScore: number;
+  pstScore: number;
+  kingSq: Int32Array;
+
+  // 置換表
+  ttHash: Float64Array;
+  ttDepth: Int8Array;
+  ttScore: Int16Array;
+  ttFlag: Int8Array;
+  ttMove: Int32Array;
+
+  // キラー手・ヒストリー
+  killers: Int32Array;
+  history: Int32Array;
+
+  // 履歴
+  moveHistory: Int32Array;
+  capturedHistory: Int8Array;
+  hashHistory: Float64Array;
+  historyIdx: number;
 }
 
 export interface Move {
@@ -51,6 +73,7 @@ export interface GameSettings {
   mode: GameMode;
   aiSide?: Side; // AI戦の場合、AIの手番（undefined = 対人戦）
   timeControl: TimeControl; // 1手あたりの持ち時間（秒）
+  fischerRule?: boolean; // フィッシャールール（1分+5秒/手）
 }
 
 export type GameResult = 'sente_win' | 'gote_win' | 'sente_timeout' | 'gote_timeout' | 'sente_resign' | 'gote_resign' | null;

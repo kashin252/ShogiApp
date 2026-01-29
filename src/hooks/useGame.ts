@@ -73,8 +73,9 @@ export function useGame(initialSettings: GameSettings) {
     setIsThinking(false);
     setSearchResult(null);
     setSettings(newSettings);
-    setSenteTime(newSettings.timeControl);
-    setGoteTime(newSettings.timeControl);
+    const initialTime = newSettings.fischerRule ? 60 : newSettings.timeControl;
+    setSenteTime(initialTime);
+    setGoteTime(initialTime);
     setGameResult(null);
     updateState();
 
@@ -87,7 +88,8 @@ export function useGame(initialSettings: GameSettings) {
         setIsThinking(true);
 
         // AIの思考時間を持ち時間の90%に設定（一手ごとにリセットされるため）
-        const aiThinkTime = newSettings.timeControl * 900;
+        const timeLimit = newSettings.timeControl || 10;
+        const aiThinkTime = timeLimit * 900;
         const result = await game.findBestMove(aiThinkTime);
         setSearchResult(result);
 
@@ -126,12 +128,9 @@ export function useGame(initialSettings: GameSettings) {
         clearTimer();
         setGameResult(null); // 決着がついていても戻す
 
-        // 手番の時間をリセット
-        if (game.turn === 0) {
-          setSenteTime(settings.timeControl);
-        } else {
-          setGoteTime(settings.timeControl);
-        }
+        // 両者の時間をリセット（一手ごとの制限なので）
+        setSenteTime(settings.timeControl);
+        setGoteTime(settings.timeControl);
 
         updateState();
         startTimer();
@@ -149,7 +148,7 @@ export function useGame(initialSettings: GameSettings) {
         clearTimer();
         setGameResult(null);
 
-        // 自分の手番の時間だけリセットすれば良いが、念のため両方リセット
+        // 両者の時間をリセット
         setSenteTime(settings.timeControl);
         setGoteTime(settings.timeControl);
 
@@ -169,11 +168,25 @@ export function useGame(initialSettings: GameSettings) {
         clearTimer();
         setGameResult(game.turn === 0 ? 'gote_win' : 'sente_win');
       } else {
-        // 手が進んだら次の手番の持ち時間をリセット
-        if (game.turn === 0) {
-          setSenteTime(settings.timeControl);
+        // 手が進んだら
+        if (settings.fischerRule) {
+          // フィッシャールール: 指した側に5秒追加（次の手番の時間はそのまま）
+          if (game.turn === 0) {
+            // 次の手番は先手（後手が今指した）
+            setGoteTime((prev) => Math.min(prev + 5, 300)); // 後手に+5秒（最大5分）
+          } else {
+            // 次の手番は後手（先手が今指した）
+            setSenteTime((prev) => Math.min(prev + 5, 300)); // 先手に+5秒（最大5分）
+          }
         } else {
-          setGoteTime(settings.timeControl);
+          // 通常: 次の手番の時間をリセット
+          if (game.turn === 0) {
+            // 次の手番は先手
+            setSenteTime(settings.timeControl);
+          } else {
+            // 次の手番は後手
+            setGoteTime(settings.timeControl);
+          }
         }
         startTimer();
       }
@@ -186,32 +199,34 @@ export function useGame(initialSettings: GameSettings) {
         setIsThinking(true);
 
         setTimeout(async () => {
-          // AIの思考時間を持ち時間の90%に設定（一手ごとにリセットされるため）
-          const aiThinkTime = settings.timeControl * 900;
+          // AIの思考時間計算
+          // 現在の残り時間を取得（ミリ秒換算）
+          const currentRemainingTime = settings.aiSide === 0 ? senteTime : goteTime;
+
+          // 一手ごとの時間制限の80%を使う
+          let aiThinkTime = currentRemainingTime * 1000 * 0.8;
+
+          // 残り時間が非常に少ない場合（2秒未満）は、最低1秒確保
+          if (currentRemainingTime < 2) {
+            aiThinkTime = 1000;
+          }
 
           const startTime = Date.now();
           const result = await game.findBestMove(aiThinkTime);
-          const elapsed = Math.floor((Date.now() - startTime) / 1000); // 経過時間（秒）
+          // AIの消費時間を計測するが必要ない（次の手番でリセットされるため）
 
           setSearchResult(result);
 
           if (result.move !== 0) {
-            const success = game.applyMove(result.move);
+            game.applyMove(result.move);
             game.lastMovePos = decodeTo(result.move);
-
-            // AIの消費時間を反映
-            if (game.turn === 0) { // 次が先手（つまりAIは後手だった）
-              setGoteTime(prev => Math.max(0, prev - elapsed));
-            } else { // 次が後手（つまりAIは先手だった）
-              setSenteTime(prev => Math.max(0, prev - elapsed));
-            }
 
             // 詰みチェック
             if (game.gameOver) {
               clearTimer();
               setGameResult(game.turn === 0 ? 'gote_win' : 'sente_win');
             } else {
-              // AI着手後、次の手番の持ち時間をリセット
+              // ユーザーの手番（次）の時間をリセット
               if (game.turn === 0) {
                 setSenteTime(settings.timeControl);
               } else {
@@ -229,7 +244,7 @@ export function useGame(initialSettings: GameSettings) {
 
       return success;
     },
-    [game, settings, updateState, clearTimer, startTimer]
+    [game, settings, updateState, clearTimer, startTimer, senteTime, goteTime]
   );
 
   const getLegalMoves = useCallback(

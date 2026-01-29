@@ -32,12 +32,19 @@
       "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
       "package": "com.kashin252.shogiapp",
-      "versionCode": 13,
+      "versionCode": 43,
       "permissions": [
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "com.android.vending.BILLING"
       ]
     },
+    "plugins": [
+      [
+        "expo-localization"
+      ],
+      "react-native-iap"
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     },

@@ -1,0 +1,16 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /Users/user/ShogiApp/modules/shogi-engine/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2902605279342195736.xml:2:13-83
+INJECTED from /Users/user/ShogiApp/modules/shogi-engine/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2902605279342195736.xml:2:13-83
+	package
+		INJECTED from /Users/user/ShogiApp/modules/shogi-engine/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2902605279342195736.xml
+	xmlns:android
+		ADDED from /Users/user/ShogiApp/modules/shogi-engine/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2902605279342195736.xml:2:23-81
+uses-sdk
+INJECTED from /Users/user/ShogiApp/modules/shogi-engine/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2902605279342195736.xml reason: use-sdk injection requested
+INJECTED from /Users/user/ShogiApp/modules/shogi-engine/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2902605279342195736.xml
+INJECTED from /Users/user/ShogiApp/modules/shogi-engine/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2902605279342195736.xml
+	android:targetSdkVersion
+		INJECTED from /Users/user/ShogiApp/modules/shogi-engine/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2902605279342195736.xml
+	android:minSdkVersion
+		INJECTED from /Users/user/ShogiApp/modules/shogi-engine/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest2902605279342195736.xml

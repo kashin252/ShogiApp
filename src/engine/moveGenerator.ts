@@ -1,4 +1,4 @@
-import { ShogiGame } from './game';
+import type { GameState } from '../types/game.types';
 import { FU, KYO, KEI, GIN, KIN, KAKU, HI, OU, TO, NKYO, NKEI, NGIN, UMA, RYU, ZOU, TAISHI } from '../types/game.types';
 import { PROMOTE_MAP, UNPROMOTE } from './constants';
 import { encodeMove } from './move';
@@ -9,7 +9,7 @@ import {
   kyoAttacks, kakuAttacks, hiAttacks
 } from './attackTables';
 
-export function generateMoves(game: ShogiGame, moves: Int32Array): number {
+export function generateMoves(game: GameState, moves: Int32Array): number {
   let idx = 0;
   const side = game.turn;
   const sign = side === 0 ? 1 : -1;
