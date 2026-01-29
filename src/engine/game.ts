@@ -178,7 +178,7 @@ export class ShogiGame implements GameState {
     }
   }
 
-  async findBestMove(timeLimit: number = 15000): Promise<SearchResult> {
+  async findBestMove(timeLimit: number = 15000, maxDepth?: number): Promise<SearchResult> {
     // 定跡チェック（序盤のみ）
     if (this.ply < 20) {
       const { getJosekiMove } = await import('./josekiService');
@@ -260,7 +260,7 @@ export class ShogiGame implements GameState {
     }
 
     // TypeScript版（フォールバック / Web）
-    return iterativeDeepening(this, timeLimit);
+    return iterativeDeepening(this, timeLimit, maxDepth);
   }
 
   getLegalMoves(from?: number, dropPiece?: number): number[] {

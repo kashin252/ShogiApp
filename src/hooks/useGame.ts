@@ -90,7 +90,8 @@ export function useGame(initialSettings: GameSettings) {
         // AIの思考時間を持ち時間の90%に設定（一手ごとにリセットされるため）
         const timeLimit = newSettings.timeControl || 10;
         const aiThinkTime = timeLimit * 900;
-        const result = await game.findBestMove(aiThinkTime);
+        const maxDepth = newSettings.timeControl === 30 ? 10 : (newSettings.timeControl === 60 ? 13 : undefined);
+        const result = await game.findBestMove(aiThinkTime, maxDepth);
         setSearchResult(result);
 
         if (result.move !== 0) {
@@ -118,9 +119,26 @@ export function useGame(initialSettings: GameSettings) {
     updateState();
   }, [game, clearTimer, updateState]);
 
+  const cancelSearchRef = useRef(false);
+
   // 待った処理
   const undo = useCallback(() => {
-    if (isThinking) return; // AI思考中は不可
+    // AI思考中ならキャンセルフラグを立てて思考を中断扱いにする
+    if (isThinking) {
+      cancelSearchRef.current = true;
+      setIsThinking(false);
+
+      // AI思考中はまだAIが指していないので、自分の手(1手)だけ戻す
+      if (game.undo()) {
+        clearTimer();
+        setGameResult(null);
+        setSenteTime(settings.timeControl);
+        setGoteTime(settings.timeControl);
+        updateState();
+        startTimer();
+      }
+      return;
+    }
 
     if (settings.mode === 'pvp') {
       // 対人戦は1手戻す
@@ -136,19 +154,13 @@ export function useGame(initialSettings: GameSettings) {
         startTimer();
       }
     } else {
-      // AI戦は2手戻す（自分の手番に戻す）
-      // ただし、AIが先手でまだ初手の場合は何もしない、あるいは自分が後手でAIが指した直後なら1手戻すなど調整が必要
-      // 基本的に「自分の手番」に戻すことを目指す
-
-      // 1手戻す（AIの手を戻す）
-      if (game.undo()) {
-        // さらにもう1手戻す（自分の手を戻す）
-        game.undo();
+      // AI戦（AIの手番終了後）は2手戻す
+      if (game.undo()) { // AIの手を戻す
+        game.undo(); // 自分の手を戻す
 
         clearTimer();
         setGameResult(null);
 
-        // 両者の時間をリセット
         setSenteTime(settings.timeControl);
         setGoteTime(settings.timeControl);
 
@@ -197,8 +209,12 @@ export function useGame(initialSettings: GameSettings) {
       // AI対局の場合
       if (settings.mode === 'ai' && !game.gameOver && game.turn === settings.aiSide) {
         setIsThinking(true);
+        cancelSearchRef.current = false; // フラグをリセット
 
         setTimeout(async () => {
+          // キャンセルされていたら処理を中断
+          if (cancelSearchRef.current) return;
+
           // AIの思考時間計算
           // 現在の残り時間を取得（ミリ秒換算）
           const currentRemainingTime = settings.aiSide === 0 ? senteTime : goteTime;
@@ -212,8 +228,13 @@ export function useGame(initialSettings: GameSettings) {
           }
 
           const startTime = Date.now();
-          const result = await game.findBestMove(aiThinkTime);
-          // AIの消費時間を計測するが必要ない（次の手番でリセットされるため）
+          // キャンセルチェックを入れたいところだが、findBestMoveはawaitしているので
+          // 完了後に再度チェックする
+          const maxDepth = settings.timeControl === 30 ? 10 : (settings.timeControl === 60 ? 13 : undefined);
+          const result = await game.findBestMove(aiThinkTime, maxDepth);
+
+          // 思考完了後に再度キャンセルチェック
+          if (cancelSearchRef.current) return;
 
           setSearchResult(result);
 

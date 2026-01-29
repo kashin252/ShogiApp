@@ -173,7 +173,7 @@ function quiesce(
   nodes++;
 
   // 時間チェック
-  if ((nodes & 1023) === 0) {
+  if ((nodes & 4095) === 0) {
     if (Date.now() - startTime > timeLimit) {
       stopped = true;
       return 0;
@@ -253,7 +253,7 @@ function alphaBeta(
   nodes++;
 
   // 時間チェック
-  if ((nodes & 1023) === 0) {
+  if ((nodes & 4095) === 0) {
     if (Date.now() - startTime > timeLimit) {
       stopped = true;
       return 0;
@@ -454,7 +454,7 @@ function alphaBeta(
 // ========================================
 // 反復深化（メインエントリポイント）
 // ========================================
-export function iterativeDeepening(game: GameState, timeMs: number): SearchResult {
+export function iterativeDeepening(game: GameState, timeMs: number, maxDepth?: number): SearchResult {
   nodes = 0;
   startTime = Date.now();
   timeLimit = timeMs;
@@ -492,7 +492,8 @@ export function iterativeDeepening(game: GameState, timeMs: number): SearchResul
   bestMove = legal[0];
 
   // 反復深化ループ
-  for (let depth = 1; depth <= 30; depth++) {
+  const limit = maxDepth || 30;
+  for (let depth = 1; depth <= limit; depth++) {
     const score = alphaBeta(game, depth, -100000, 100000, true, 0);
 
     if (stopped) break;

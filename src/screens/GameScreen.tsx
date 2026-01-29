@@ -428,7 +428,7 @@ export const GameScreen: React.FC = () => {
           <TouchableOpacity
             style={[styles.button, { backgroundColor: '#888', marginLeft: 8 }]}
             onPress={handleUndo}
-            disabled={isThinking || gameState.moveCount === 0}
+            disabled={gameState.historyIdx === 0}
           >
             <Text style={styles.buttonText}>
               {!isPremium && '🔒 '}{i18n.t('buttons.undo')}
@@ -445,6 +445,7 @@ export const GameScreen: React.FC = () => {
         >
           <View style={styles.modalOverlay}>
             <ScrollView
+              style={styles.modalScrollView}
               contentContainerStyle={styles.modalScrollContent}
               showsVerticalScrollIndicator={false}
             >
@@ -495,10 +496,8 @@ export const GameScreen: React.FC = () => {
                   options={[
                     ...(newGameSettings.mode === 'pvp' && isPremium ? [{ label: i18n.t('time.unlimited'), value: 0 }] : []),
                     { label: `10${i18n.t('time.seconds')}`, value: 10 },
-                    ...(isPremium ? [
-                      { label: `30${i18n.t('time.seconds')}`, value: 30 },
-                      { label: `60${i18n.t('time.seconds')}`, value: 60 },
-                    ] : []),
+                    { label: `30${i18n.t('time.seconds')}`, value: 30 },
+                    { label: `60${i18n.t('time.seconds')}`, value: 60 },
                   ] /* options */}
                   onSelect={(value) => setNewGameSettings({ ...newGameSettings, timeControl: value, fischerRule: false })}
                 />
@@ -767,6 +766,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  modalScrollView: {
+    width: '100%',
+  },
   modalScrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
@@ -913,6 +915,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     borderWidth: 2,
     borderColor: 'transparent',
+    width: '100%',
   },
   checkboxRowSelected: {
     backgroundColor: '#fff',

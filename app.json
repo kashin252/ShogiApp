@@ -32,7 +32,7 @@
       "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
       "package": "com.kashin252.shogiapp",
-      "versionCode": 43,
+      "versionCode": 49,
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",

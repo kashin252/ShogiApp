@@ -110,7 +110,7 @@ export const PremiumScreen: React.FC<PremiumScreenProps> = ({ onClose }) => {
                     <View style={styles.header}>
                         <View>
                             <Text style={styles.title}>{i18n.t('modals.premium.subscribedTitle')}</Text>
-                            <Text style={styles.versionText}>Build: 40</Text>
+                            <Text style={styles.versionText}>Build: 49</Text>
                         </View>
                         <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                             <Text style={styles.closeButtonText}>✕</Text>
