@@ -496,8 +496,10 @@ export const GameScreen: React.FC = () => {
                   options={[
                     ...(newGameSettings.mode === 'pvp' && isPremium ? [{ label: i18n.t('time.unlimited'), value: 0 }] : []),
                     { label: `10${i18n.t('time.seconds')}`, value: 10 },
-                    { label: `30${i18n.t('time.seconds')}`, value: 30 },
-                    { label: `60${i18n.t('time.seconds')}`, value: 60 },
+                    ...(isPremium ? [
+                      { label: `30${i18n.t('time.seconds')}`, value: 30 },
+                      { label: `60${i18n.t('time.seconds')}`, value: 60 },
+                    ] : []),
                   ] /* options */}
                   onSelect={(value) => setNewGameSettings({ ...newGameSettings, timeControl: value, fischerRule: false })}
                 />
