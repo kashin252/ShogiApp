@@ -16,6 +16,7 @@ import { PlayLimitModal } from '../components/PlayLimitModal';
 import { PromoteModal } from '../components/PromoteModal';
 import { Dropdown } from '../components/Dropdown';
 import { InfoModal } from '../components/InfoModal';
+import { Platform } from 'react-native';
 import { PremiumScreen } from './PremiumScreen';
 import { useGame } from '../hooks/useGame';
 import { GameSettings, TimeControl, GameResult } from '../types/game.types';
@@ -23,6 +24,8 @@ import i18n from '../i18n/translations';
 import { colors } from '../styles/colors';
 import { decodeTo, decodePromote } from '../engine/move';
 import { StorageService } from '../services/StorageService';
+import * as ShogiEngine from 'shogi-engine';
+
 // import { AdService } from '../services/AdService';
 // import { PurchaseService } from '../services/PurchaseService';
 
@@ -35,13 +38,16 @@ export const GameScreen: React.FC = () => {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
   const [remainingPlays, setRemainingPlays] = useState(5);
+  const [isPlayBlocked, setIsPlayBlocked] = useState(false);
 
   // 新規対局の設定
   const [newGameSettings, setNewGameSettings] = useState<GameSettings>({
     mode: 'pvp',
-    timeControl: 10,
+    timeControl: 30,
     fischerRule: false,
   });
+
+
 
   const {
     gameState,
@@ -84,6 +90,21 @@ export const GameScreen: React.FC = () => {
       const remaining = await StorageService.getRemainingPlays();
       setRemainingPlays(remaining);
 
+      // 初期ゲーム（アプリ起動時の対局）のプレイ回数チェック
+      if (!premium) {
+        const canPlayNow = await StorageService.canPlay();
+        if (!canPlayNow) {
+          // プレイ制限に達している場合、対局をブロック
+          setIsPlayBlocked(true);
+          setShowPlayLimitModal(true);
+        } else {
+          // 初期ゲームもプレイ回数としてカウント
+          await StorageService.incrementPlayCount();
+          const updatedRemaining = await StorageService.getRemainingPlays();
+          setRemainingPlays(updatedRemaining);
+        }
+      }
+
       // お知らせモーダルの自動表示チェック
       const currentVersion = '1.0.0'; // アプリバージョン
       const lastShownVersion = await StorageService.getLastInfoModalVersion();
@@ -104,12 +125,6 @@ export const GameScreen: React.FC = () => {
     // 広告とIAPを初期化（エラーが発生しても続行）
     // クラッシュ調査のため一時的に無効化
     /*
-    try {
-      await AdService.initAds();
-    } catch (error) {
-      console.error('Failed to initialize ads:', error);
-    }
-
     try {
       await PurchaseService.initIAP();
     } catch (error) {
@@ -133,6 +148,10 @@ export const GameScreen: React.FC = () => {
   };
 
   const handleSquarePress = (sq: number) => {
+    if (isPlayBlocked) {
+      setShowPlayLimitModal(true);
+      return;
+    }
     if (gameState.gameOver) return;
     if (settings.mode === 'ai' && gameState.turn === settings.aiSide) return;
 
@@ -145,9 +164,9 @@ export const GameScreen: React.FC = () => {
 
       if (targetMove) {
         makeMove(targetMove);
-        setSelection(null);
-        setLegalMoves([]);
       }
+      setSelection(null);
+      setLegalMoves([]);
       return;
     }
 
@@ -177,9 +196,15 @@ export const GameScreen: React.FC = () => {
 
     // 駒選択
     if ((v > 0) === (gameState.turn === 0) && v !== 0) {
-      setSelection({ pos: sq });
-      const legal = getLegalMoves(sq);
-      setLegalMoves(legal.map((m) => decodeTo(m)));
+      if (selection?.pos === sq) {
+        // すでに選択されている駒を再度タップした場合はキャンセル
+        setSelection(null);
+        setLegalMoves([]);
+      } else {
+        setSelection({ pos: sq });
+        const legal = getLegalMoves(sq);
+        setLegalMoves(legal.map((m) => decodeTo(m)));
+      }
     } else {
       setSelection(null);
       setLegalMoves([]);
@@ -208,8 +233,19 @@ export const GameScreen: React.FC = () => {
   };
 
   const handleHandPress = (side: 0 | 1, piece: number) => {
+    if (isPlayBlocked) {
+      setShowPlayLimitModal(true);
+      return;
+    }
     if (gameState.gameOver || side !== gameState.turn) return;
     if (settings.mode === 'ai' && gameState.turn === settings.aiSide) return;
+
+    // すでに同じ持ち駒が選択されている場合はキャンセル
+    if (selection && selection.drop && selection.drop.piece === piece && selection.drop.side === side) {
+      setSelection(null);
+      setLegalMoves([]);
+      return;
+    }
 
     setSelection({ drop: { piece, side } });
     const legal = getLegalMoves(undefined, piece);
@@ -233,6 +269,7 @@ export const GameScreen: React.FC = () => {
 
   const startGameAfterAd = async (gameSettings: GameSettings) => {
     setShowNewGameModal(false);
+    setIsPlayBlocked(false);
     resetGame(gameSettings);
 
     // プレイ回数をインクリメント
@@ -331,11 +368,14 @@ export const GameScreen: React.FC = () => {
           {/* Search Info Display */}
           {settings.mode === 'ai' && searchResult && (
             <View style={styles.searchInfo}>
-              <Text style={styles.searchInfoText}>
-                {i18n.t('search.depth')}: {searchResult.depth} | {i18n.t('search.score')}: {
-                  (settings.aiSide === 1 ? -searchResult.score : searchResult.score) > 0 ? '+' : ''
-                }{settings.aiSide === 1 ? -searchResult.score : searchResult.score}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+
+                <Text style={styles.searchInfoText}>
+                  {i18n.t('search.depth')}: {searchResult.depth} | {i18n.t('search.score')}: {
+                    (settings.aiSide === 1 ? -searchResult.score : searchResult.score) > 0 ? '+' : ''
+                  }{settings.aiSide === 1 ? -searchResult.score : searchResult.score}
+                </Text>
+              </View>
               <Text style={styles.searchInfoText}>
                 {i18n.t('search.nodes')}: {searchResult.nodes.toLocaleString()} | {i18n.t('search.time')}: {searchResult.time}ms
               </Text>
@@ -379,23 +419,23 @@ export const GameScreen: React.FC = () => {
             />
           </View>
 
-          {/* Sente Hand & Timer */}
+          {/* Bottom Section: Timer + Hand */}
           <View style={styles.playerSection}>
-            <View style={[styles.timerBox, gameState.turn === 0 && !gameResult && styles.timerActive]}>
-              <Text style={styles.timerLabel}>{i18n.t('turn.sente')}</Text>
-              <Text style={styles.timerText}>{formatTime(senteTime)}</Text>
+            <View style={[styles.timerBox, gameState.turn === bottomHandSide && !gameResult && styles.timerActive]}>
+              <Text style={styles.timerLabel}>{bottomHandSide === 0 ? i18n.t('turn.sente') : i18n.t('turn.gote')}</Text>
+              <Text style={styles.timerText}>{formatTime(bottomHandSide === 0 ? senteTime : goteTime)}</Text>
             </View>
             <View style={styles.handContainer}>
               <CapturedPieces
-                hand={gameState.hand[0]}
-                side={0}
+                hand={gameState.hand[bottomHandSide]}
+                side={bottomHandSide}
                 selectedPiece={
-                  selection && selection.drop && selection.drop.side === 0
+                  selection && selection.drop && selection.drop.side === bottomHandSide
                     ? selection.drop.piece
                     : null
                 }
-                onPiecePress={(p) => handleHandPress(0, p)}
-                title={i18n.t('hand.sente')}
+                onPiecePress={(p) => handleHandPress(bottomHandSide, p)}
+                title={bottomHandSide === 0 ? i18n.t('hand.sente') : i18n.t('hand.gote')}
               />
             </View>
           </View>
@@ -496,8 +536,8 @@ export const GameScreen: React.FC = () => {
                   options={[
                     ...(newGameSettings.mode === 'pvp' && isPremium ? [{ label: i18n.t('time.unlimited'), value: 0 }] : []),
                     { label: `10${i18n.t('time.seconds')}`, value: 10 },
+                    { label: `30${i18n.t('time.seconds')}`, value: 30 },
                     ...(isPremium ? [
-                      { label: `30${i18n.t('time.seconds')}`, value: 30 },
                       { label: `60${i18n.t('time.seconds')}`, value: 60 },
                     ] : []),
                   ] /* options */}

@@ -30,7 +30,7 @@ const SQUARE_SIZE = Math.min(SQUARE_SIZE_W, SQUARE_SIZE_H);
 
 const BOARD_SIZE = SQUARE_SIZE * 9;
 
-export const Board: React.FC<BoardProps> = ({
+export const Board: React.FC<BoardProps> = React.memo(({
   board,
   lastMovePos,
   selectedPos,
@@ -100,7 +100,7 @@ export const Board: React.FC<BoardProps> = ({
       </ImageBackground>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   boardContainer: {

@@ -29,7 +29,7 @@ export interface GameState {
   ttMove: Int32Array;
 
   // キラー手・ヒストリー
-  killers: Int32Array;
+  killerMoves: Int32Array;
   history: Int32Array;
 
   // 履歴
@@ -63,6 +63,7 @@ export interface SearchResult {
   nodes: number;
   time: number;
   isJoseki?: boolean;
+  engineSource?: 'rust' | 'typescript' | 'joseki' | 'random';
 }
 
 export type GameMode = 'pvp' | 'ai';

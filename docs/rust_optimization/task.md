@@ -1,0 +1,32 @@
+```
+# Rust最適化 タスクリスト
+
+- [/] 既存のTypeScriptエンジンの分析 <!-- id: 0 -->
+- [x] 実装計画書の作成 <!-- id: 1 -->
+- [x] `shogi_engine` Rustクレートの初期化 <!-- id: 2 -->
+- [x] コア構造体の移植 (Board, Piece, Move) <!-- id: 3 -->
+- [x] Fix Rust Engine Legality (Check/Checkmate) <!-- id: 4 -->
+- [x] Optimize Native Library Build (LTO/O3) <!-- id: 5 -->
+- [x] Implement Null Move Pruning (NMP) <!-- id: 6 -->
+- [x] Implement Futility Pruning <!-- id: 7 -->
+- [x] Implement Lockless TT (AtomicU64) <!-- id: 8 -->
+- [x] Implement Lazy SMP (Multithreading) <!-- id: 9 -->
+- [ ] Verify Search Depth Improvement <!-- id: 10 -->
+- [x] Implement Enhanced PST (Standard Shogi Theory) <!-- id: 11 -->
+- [x] Implement Piece Mobility Bonus (Aggressive Rooks/Bishops) <!-- id: 12 -->
+- [x] Fix Bishop Head Weakness <!-- id: 13 -->
+- [x] Optimize Evaluation (Remove heavy loops) <!-- id: 14 -->
+- [x] Implement Lazy SMP Divergence (Randomization) <!-- id: 15 -->
+- [x] Aggregate Total Nodes Count <!-- id: 16 -->
+- [x] Implement PVS (Principal Variation Search) <!-- id: 17 -->
+- [x] Implement LMR (Late Move Reduction) <!-- id: 18 -->
+- [x] 評価関数の移植 (駒割り, PST, 玉の囲い) <!-- id: 9 -->
+- [x] 探索アルゴリズムの移植 (AlphaBeta, PVS, LMR, etc.) <!-- id: 10 -->
+- [x] React Native用FFIインターフェースの実装 <!-- id: 11 -->
+- [x] React Native (Expo Module) との統合 (Android) <!-- id: 12 -->
+- [x] 検証とビルド確認 (動作確認完了) <!-- id: 13 -->
+- [x] パフォーマンス最適化 (フェーズ1-3) <!-- id: 14 -->
+    - [x] Zobrist Hash & TT の実装
+    - [x] 指し手の並び替え (Ordering)の実装
+    - [x] 静止探索 & PVS 等の枝刈り強化
+    - [x] Make/Unmake & 差分評価の実装

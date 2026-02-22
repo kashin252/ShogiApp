@@ -12,7 +12,7 @@ interface CapturedPiecesProps {
   title: string;
 }
 
-export const CapturedPieces: React.FC<CapturedPiecesProps> = ({
+export const CapturedPieces: React.FC<CapturedPiecesProps> = React.memo(({
   hand,
   side,
   selectedPiece,
@@ -56,7 +56,7 @@ export const CapturedPieces: React.FC<CapturedPiecesProps> = ({
       </View>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

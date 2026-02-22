@@ -44,8 +44,19 @@ _test_build/
 # secrets & artifacts
 *.aab
 build-*.aab
+build-*.apk
 credentials.json
 .vscode/
 *.pepk
 *.keystore
 key.jks
+
+# build artifacts
+modules/shogi-engine/android/build/
+temp_aab/
+android/gradle_out.log
+
+# test/debug native libs at root
+libshogi_check_v2.so
+libshogi_engine_check.so
+1Line120

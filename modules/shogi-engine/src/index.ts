@@ -10,42 +10,40 @@ try {
 }
 
 export interface NativeSearchResult {
-    moveData: number;
-    from: number;
-    to: number;
-    piece: number;
-    captured: number;
-    promote: boolean;
-    drop: boolean;
+    move: string;
     score: number;
     depth: number;
     nodes: number;
-    timeMs: number;
 }
 
 /**
  * C++エンジンで最善手を探索
  */
-export async function findBestMoveNative(
-    board: number[],
-    senteHand: number[],
-    goteHand: number[],
-    turn: number,
-    timeLimitMs: number
+export async function searchBestMove(
+    sfen: string,
+    timeLimitMs: number,
+    maxDepth: number = 0
 ): Promise<NativeSearchResult | null> {
     if (!ShogiEngineModule) {
         return null; // ネイティブモジュールが利用不可
     }
 
     try {
-        const result = await ShogiEngineModule.findBestMove(
-            board,
-            senteHand,
-            goteHand,
-            turn,
-            timeLimitMs
-        );
-        return result as NativeSearchResult;
+        const resultString = await ShogiEngineModule.searchBestMove(sfen, timeLimitMs, maxDepth);
+        if (!resultString || typeof resultString !== 'string' || resultString.startsWith('error')) {
+            return null;
+        }
+
+        const parts = resultString.split('|');
+        if (parts.length >= 4) {
+            return {
+                move: parts[0],
+                score: parseInt(parts[1], 10),
+                depth: parseInt(parts[2], 10),
+                nodes: parseInt(parts[3], 10),
+            };
+        }
+        return null;
     } catch (error) {
         console.error('Native search failed:', error);
         return null;

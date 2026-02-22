@@ -90,7 +90,7 @@ export function useGame(initialSettings: GameSettings) {
         // AIの思考時間を持ち時間の90%に設定（一手ごとにリセットされるため）
         const timeLimit = newSettings.timeControl || 10;
         const aiThinkTime = timeLimit * 900;
-        const maxDepth = newSettings.timeControl === 30 ? 10 : (newSettings.timeControl === 60 ? 13 : undefined);
+        const maxDepth = newSettings.timeControl === 30 ? 17 : (newSettings.timeControl === 60 ? 21 : undefined);
         const result = await game.findBestMove(aiThinkTime, maxDepth);
         setSearchResult(result);
 
@@ -230,7 +230,7 @@ export function useGame(initialSettings: GameSettings) {
           const startTime = Date.now();
           // キャンセルチェックを入れたいところだが、findBestMoveはawaitしているので
           // 完了後に再度チェックする
-          const maxDepth = settings.timeControl === 30 ? 10 : (settings.timeControl === 60 ? 13 : undefined);
+          const maxDepth = settings.timeControl === 30 ? 17 : (settings.timeControl === 60 ? 21 : undefined);
           const result = await game.findBestMove(aiThinkTime, maxDepth);
 
           // 思考完了後に再度キャンセルチェック

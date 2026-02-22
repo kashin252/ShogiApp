@@ -1,0 +1,14 @@
+- [x] ネイティブ連携層 (JNI) の改善
+  - [x] `ShogiEngineModule.kt` に Kotlin Coroutines を導入
+  - [x] `searchBestMove` を非同期化し、UIスレッドのブロックを解消
+- [x] フロントエンド層 (React Native) の改善
+  - [x] 持ち駒タップ後のキャンセル機能（盤面外タップ等での選択解除）の実装
+  - [x] `GameScreen.tsx` の状態管理をカスタムフックに分離
+  - [x] メインの盤面表示コンポーネントなどに `React.memo` を適用し、不要な再レンダリングを防止
+- [x] バックエンド層 (Rust Engine) の探索効率強化
+  - [x] 探索処理 (`search.rs`) における Killer Move や History Heuristic 等の導入検討
+  - [x] Null Move Pruning の導入または最適化
+- [x] バックエンド層 (Rust Engine) の評価関数強化
+  - [x] `evaluate.rs` に駒のモビリティ（可動域）評価の追加
+  - [x] 囲いの評価や、王の安全性（King Safety）評価の精緻化
+- [x] 実機および単体テストによる動作検証

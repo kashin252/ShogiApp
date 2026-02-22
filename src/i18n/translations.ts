@@ -130,7 +130,7 @@ const i18n = new I18n({
                 rule: {
                     title: '独自の将棋ルール',
                     text: '本アプリでは、通常の将棋ルールに加えて以下の独自ルールを採用しています。\n新しい駒の酔象を追加。後ろ以外の周囲７マスに移動できる。\n成ると太子に成ることができる。玉と同じ動きができる。\n酔象は相手に取られると再利用できない。\nそれ以外は本将棋と同じルールにしています。',
-                    bullet1: '• 無料版:プレイ回数制限（1日5回まで無料）,一手10秒のみ',
+                    bullet1: '• 無料版:プレイ回数制限（1日5回まで無料）',
                     bullet2: '• 有料版:無制限プレイ、フィッシャルール選択可能',
                     bullet3: '• 敵陣に入った際の「成り」選択機能',
                 },
@@ -270,7 +270,7 @@ const i18n = new I18n({
                 rule: {
                     title: 'Unique Shogi Rules',
                     text: 'This app adopts the following unique rules in addition to standard Shogi rules.\nAdded a new piece "Drunken Elephant" (Suizo). It can move to any of the 7 surrounding squares except directly backward.\nIt can promote to "Crown Prince" (Taishi), which moves like a King.\nOnce captured, the Drunken Elephant cannot be dropped back onto the board.\nOther rules are the same as standard Shogi.',
-                    bullet1: '• Free version: Play limit (5 free plays per day), 10 seconds per move only',
+                    bullet1: '• Free version: Play limit (5 free plays per day)',
                     bullet2: '• Premium version: Unlimited plays, Fischer rule available',
                     bullet3: '• "Promote" selection when entering enemy camp',
                 },
